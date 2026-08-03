@@ -129,7 +129,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     const jobs = getStoredJobs();
 
     const costNum = Number(extCostPrice) || 0;
-    const sellingNum = Number(extSellingPrice) || 0;
+    const sellingNum = Number(extSellingPrice) || (costNum > 0 ? Number((costNum + (costNum * (Number(extMarginPercent) || 30)) / 100).toFixed(2)) : 0);
     const computedMargin = Number(extMarginPercent) || (costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0);
     const laborNum = Number(laborCharge) || 0;
     const depositNum = Number(advanceDeposit) || 0;
@@ -139,7 +139,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         if (j.id === jobToEdit.id) {
           let updatedParts = j.parts || [];
 
-          if (hasExternalParts && extPartName.trim() && sellingNum > 0) {
+          if (hasExternalParts && extPartName.trim()) {
             const extJobPart: JobPart = {
               id: 'jp-ext-' + Date.now(),
               job_card_id: j.id,
@@ -154,7 +154,13 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               vendor_name: extShopName || 'Outside Shop',
               warranty_days: 30,
             };
-            updatedParts = [...updatedParts, extJobPart];
+            // Prevent duplicate external part adding if already exists
+            const existsIndex = updatedParts.findIndex(p => p.is_external && p.part_name.startsWith(extPartName));
+            if (existsIndex >= 0) {
+              updatedParts[existsIndex] = extJobPart;
+            } else {
+              updatedParts = [...updatedParts, extJobPart];
+            }
           }
 
           const partsTotal = updatedParts.reduce((acc, p) => acc + p.total_price, 0);
@@ -188,7 +194,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       const newJobId = 'job-' + Date.now();
       let initialParts: JobPart[] = [];
 
-      if (hasExternalParts && extPartName.trim() && sellingNum > 0) {
+      if (hasExternalParts && extPartName.trim()) {
         initialParts.push({
           id: 'jp-ext-' + Date.now(),
           job_card_id: newJobId,
@@ -411,13 +417,13 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Part Name (කොටසේ නම)</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Part Name (කොටසේ නම) *</label>
                     <input
                       type="text"
                       value={extPartName}
                       onChange={(e) => setExtPartName(e.target.value)}
                       placeholder="e.g. Stihl MS180 Carburetor"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-slate-950 border border-amber-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none font-bold"
                     />
                   </div>
                 </div>
@@ -459,7 +465,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                     </div>
 
                     <div>
-                      <label className="block text-emerald-400 text-[10px] font-bold mb-1">Bill Retail Price (LKR) *</label>
+                      <label className="block text-emerald-400 text-[10px] font-bold mb-1">Bill Retail Price (LKR)</label>
                       <input
                         type="number"
                         min="0"
@@ -471,9 +477,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 italic">
-                    💡 Bill Retail Price එක වෙනස් කළ විට Margin % එක ස්වයංක්‍රීයව සෑදේ. Bill එකට එකතු වන්නේ මෙම Retail Price එකයි.
-                  </p>
                 </div>
               </div>
             )}

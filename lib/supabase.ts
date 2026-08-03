@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { JobCard, Part, Invoice, BusinessProfile, Technician } from './types';
+import { JobCard, Part, Invoice, BusinessProfile, Technician, JobPart } from './types';
 
 const HARDCODED_SUPABASE_URL = 'https://emvbsjturokhyjpeoiiv.supabase.co';
 const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-LypOTejP6u60giaxA_sk76E7d9';
@@ -227,6 +227,7 @@ export async function saveStoredJobs(jobs: JobCard[]) {
           ext_part_name: j.ext_part_name,
           ext_cost_price: j.ext_cost_price,
           ext_selling_price: j.ext_selling_price,
+          external_parts_note: JSON.stringify(j.parts || []),
           created_at: j.created_at,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'job_no' });
@@ -265,29 +266,63 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
 
     const cloudJobs: JobCard[] = data
       .filter((row: any) => row.job_no !== 'SYS-CONFIG-PROFILE')
-      .map((row: any) => ({
-        id: row.id,
-        job_no: row.job_no,
-        customer_name: row.customer_name,
-        phone_number: row.phone_number,
-        machine_category: row.machine_category,
-        brand_model: row.brand_model,
-        serial_number: row.serial_number || '',
-        reported_fault: row.reported_fault,
-        status: row.status,
-        labor_charge: Number(row.labor_charge) || 0,
-        advance_deposit: Number(row.advance_deposit) || 0,
-        total_amount: Number(row.total_amount) || 0,
-        assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
-        has_external_parts: row.has_external_parts,
-        ext_shop_name: row.ext_shop_name,
-        ext_part_name: row.ext_part_name,
-        ext_cost_price: Number(row.ext_cost_price) || 0,
-        ext_selling_price: Number(row.ext_selling_price) || 0,
-        parts: [],
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      }));
+      .map((row: any) => {
+        let partsList: JobPart[] = [];
+
+        if (row.external_parts_note) {
+          try {
+            const parsed = JSON.parse(row.external_parts_note);
+            if (Array.isArray(parsed)) {
+              partsList = parsed;
+            }
+          } catch (e) {}
+        }
+
+        // Fallback: If parts array is empty but ext_part_name is set, construct the outside shop part automatically!
+        if (partsList.length === 0 && row.ext_part_name) {
+          const sellingNum = Number(row.ext_selling_price) || Number(row.ext_cost_price) || 0;
+          const costNum = Number(row.ext_cost_price) || 0;
+          const marginNum = costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0;
+          partsList.push({
+            id: 'jp-ext-cloud-' + row.id,
+            job_card_id: row.id,
+            part_id: 'ext-part-' + row.id,
+            part_name: `${row.ext_part_name} (Outside Shop)`,
+            quantity: 1,
+            unit_price: sellingNum,
+            total_price: sellingNum,
+            cost_price: costNum,
+            margin_percent: marginNum,
+            is_external: true,
+            vendor_name: row.ext_shop_name || 'Outside Shop',
+            warranty_days: 30,
+          });
+        }
+
+        return {
+          id: row.id,
+          job_no: row.job_no,
+          customer_name: row.customer_name,
+          phone_number: row.phone_number,
+          machine_category: row.machine_category,
+          brand_model: row.brand_model,
+          serial_number: row.serial_number || '',
+          reported_fault: row.reported_fault,
+          status: row.status,
+          labor_charge: Number(row.labor_charge) || 0,
+          advance_deposit: Number(row.advance_deposit) || 0,
+          total_amount: Number(row.total_amount) || 0,
+          assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
+          has_external_parts: row.has_external_parts,
+          ext_shop_name: row.ext_shop_name,
+          ext_part_name: row.ext_part_name,
+          ext_cost_price: Number(row.ext_cost_price) || 0,
+          ext_selling_price: Number(row.ext_selling_price) || 0,
+          parts: partsList,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        };
+      });
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_jobs', JSON.stringify(cloudJobs));
