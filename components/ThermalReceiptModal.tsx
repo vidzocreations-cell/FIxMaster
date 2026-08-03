@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Printer, Wrench, Phone, MapPin, CheckCircle2, QrCode } from 'lucide-react';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 
@@ -13,7 +14,13 @@ interface ThermalReceiptModalProps {
 }
 
 export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard, profile }: ThermalReceiptModalProps) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handlePrint = () => {
     window.print();
@@ -31,18 +38,19 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
   const discount = invoice ? invoice.discount : 0;
   const netPayable = invoice ? invoice.net_payable : Math.max(0, subtotal - deposit - discount);
 
-  return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-0 sm:p-6 flex items-start sm:items-center justify-center min-h-screen">
+      <div className="w-full max-w-lg bg-slate-900 sm:rounded-2xl border-0 sm:border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative min-h-screen sm:min-h-0 sm:my-auto sm:max-h-[88vh] overflow-y-auto">
         {/* Top Modal Controls (Screen Only) */}
-        <div className="flex items-center justify-between no-print border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40">
+        <div className="flex items-center justify-between no-print border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40 pt-2 sm:pt-0">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-cyan-400" />
             <h2 className="text-sm sm:text-base font-bold text-white">POS Thermal Receipt & Invoice Preview</h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -172,14 +180,16 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
         </div>
 
         {/* Action Controls (Screen Only) */}
-        <div className="no-print flex items-center gap-3 pt-2">
+        <div className="no-print flex items-center gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
           <button
+            type="button"
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handlePrint}
             className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
           >
@@ -189,4 +199,6 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
