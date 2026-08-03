@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, session } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -18,16 +18,26 @@ function createWindow() {
     backgroundColor: '#090d16',
   });
 
-  // Load the exact Vercel Live Production URL connected to Supabase Cloud
   const liveAppUrl = 'https://fix-master-git-main-hansa7788-s-projects1.vercel.app';
-  mainWindow.loadURL(liveAppUrl);
+
+  // Clear session cache before loading to guarantee instant realtime cloud data sync
+  session.defaultSession.clearCache().then(() => {
+    mainWindow.loadURL(liveAppUrl);
+  });
 
   // Custom Application Top Menu
   const template = [
     {
       label: 'FixMaster POS',
       submenu: [
-        { label: 'Reload System (Sync Live Updates)', accelerator: 'CmdOrCtrl+R', click: () => mainWindow.reload() },
+        {
+          label: 'Reload System (Sync Live Updates)',
+          accelerator: 'CmdOrCtrl+R',
+          click: async () => {
+            await session.defaultSession.clearCache();
+            mainWindow.reload();
+          }
+        },
         { label: 'Toggle Full Screen', accelerator: 'F11', click: () => mainWindow.setFullScreen(!mainWindow.isFullScreen()) },
         { type: 'separator' },
         { label: 'Exit Application', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
