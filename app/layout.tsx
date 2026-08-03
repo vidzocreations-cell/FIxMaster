@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: 'FixMaster POS & Repair Management System',
   description: 'Point of Sale & Repair System for Multi-Category Hardware & Power Tools Repair Shops.',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'FixMaster',
+  },
 };
 
 export const viewport: Viewport = {
@@ -20,6 +25,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" suppressHydrationWarning>
         <Navbar />
         <div className="flex flex-1 overflow-hidden">
@@ -28,6 +37,19 @@ export default function RootLayout({
             {children}
           </main>
         </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
