@@ -27,6 +27,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // HARDCODED VERCEL LIVE PRODUCTION DOMAIN (Connects 100% automatically out-of-the-box on all phones)
+        val DEFAULT_VERCEL_URL = "https://fix-master-git-main-hansa7788-s-projects1.vercel.app"
+
         setContent {
             FixMasterPOSTheme {
                 val context = LocalContext.current
@@ -34,7 +37,7 @@ class MainActivity : ComponentActivity() {
                 
                 var savedUrl by remember {
                     mutableStateOf(
-                        prefs.getString("app_url", "https://fix-master.vercel.app") ?: "https://fix-master.vercel.app"
+                        prefs.getString("app_url", DEFAULT_VERCEL_URL) ?: DEFAULT_VERCEL_URL
                     )
                 }
                 var showSettingsDialog by remember { mutableStateOf(false) }
@@ -43,16 +46,16 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         PosWebViewContainer(url = savedUrl)
 
-                        // Floating Settings Button in Top Right Corner
+                        // Small Floating Settings Gear (Only used if you want to manually change URL)
                         SmallFloatingActionButton(
                             onClick = { showSettingsDialog = true },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(12.dp),
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ) {
-                            Text("⚙️", fontSize = 16.sp)
+                            Text("⚙️", fontSize = 14.sp)
                         }
 
                         if (showSettingsDialog) {
@@ -129,11 +132,11 @@ fun UrlInputDialog(currentUrl: String, onSave: (String) -> Unit, onDismiss: () -
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Connect FixMaster POS", fontSize = 16.sp) },
+        title = { Text("Connect FixMaster POS Domain", fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Enter your Vercel deployment URL:",
+                    "Enter your exact Vercel deployment URL:",
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
