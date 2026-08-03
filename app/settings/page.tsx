@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldCheck, Database, Download, Upload, RotateCcw, Save, Building, Link2, CheckCircle2 } from 'lucide-react';
+import { Settings, ShieldCheck, Database, Download, Upload, RotateCcw, Save, Building, Link2, CheckCircle2, RefreshCw, Sparkles, Smartphone } from 'lucide-react';
 import { getStoredProfile, saveStoredProfile, getStoredJobs, saveStoredJobs, getStoredParts, saveStoredParts, getStoredInvoices, saveStoredInvoices } from '@/lib/supabase';
 import { BusinessProfile } from '@/lib/types';
 
@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const [sbUrl, setSbUrl] = useState('');
   const [sbKey, setSbKey] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const prof = getStoredProfile();
@@ -31,6 +32,19 @@ export default function SettingsPage() {
     }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSyncLiveUpdates = async () => {
+    setIsUpdating(true);
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.update();
+      }
+    }
+    setTimeout(() => {
+      window.location.reload();
+    }, 600);
   };
 
   // Export JSON Backup
@@ -95,9 +109,9 @@ export default function SettingsPage() {
       {/* Top Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-          <Settings className="w-6 h-6 text-cyan-400" /> Settings & Supabase Cloud Link
+          <Settings className="w-6 h-6 text-cyan-400" /> Settings & Live System Sync
         </h1>
-        <p className="text-xs text-slate-400">Configure business information, Supabase database keys & data backup controls</p>
+        <p className="text-xs text-slate-400">Configure business information, Supabase database keys, live app updates & data backup controls</p>
       </div>
 
       {saveSuccess && (
@@ -105,6 +119,33 @@ export default function SettingsPage() {
           <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Settings & Supabase credentials saved successfully!
         </div>
       )}
+
+      {/* 0. In-App Instant Live Updater (APK Re-install නොකර Instant Update ගැනීම) */}
+      <div className="glass-panel p-6 rounded-2xl border border-cyan-800/60 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/40 space-y-4 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400" /> In-App Instant System Updater (ලයිව් Updates ලබාගන්න)
+          </h2>
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold flex items-center gap-1">
+            <Smartphone className="w-3.5 h-3.5 text-cyan-400" /> No APK Re-install Needed
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-300">
+          💡 System එකට කරනු ලබන **සියලුම නව Updates (Job Cards, Modals, Designs, Fixes)** APK එක නැවත Install නොකරම 1-Click එකෙන් සජීවීව Phone එකට ලබාගැනීමට පහත බටන් එක Click කරන්න.
+        </p>
+
+        <div className="pt-1">
+          <button
+            onClick={handleSyncLiveUpdates}
+            disabled={isUpdating}
+            className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg shadow-emerald-950 flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+            <span>{isUpdating ? 'Checking & Applying Live Updates...' : '🚀 Check & Apply Live Updates Now (නවතම Updates සජීවීව ලබාගන්න)'}</span>
+          </button>
+        </div>
+      </div>
 
       {/* 1. Supabase Cloud Configuration */}
       <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Wrench, ShieldCheck, Download, Smartphone, RefreshCw, Zap } from 'lucide-react';
+import { Wrench, ShieldCheck, Smartphone, RefreshCw, Zap } from 'lucide-react';
 import { getStoredJobs, getStoredParts } from '@/lib/supabase';
 
 export default function Navbar() {
@@ -9,6 +9,7 @@ export default function Navbar() {
   const [lowStockCount, setLowStockCount] = useState(0);
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const jobs = getStoredJobs();
@@ -39,18 +40,31 @@ export default function Navbar() {
     }
   };
 
+  const handleSyncUpdates = async () => {
+    setIsUpdating(true);
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.update();
+      }
+    }
+    setTimeout(() => {
+      window.location.reload();
+    }, 600);
+  };
+
   return (
-    <header className="h-16 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-30 px-4 md:px-6 flex items-center justify-between">
+    <header className="h-16 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-30 px-3 md:px-6 flex items-center justify-between">
       {/* Brand & Status */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <Wrench className="w-5 h-5 text-white" />
+      <div className="flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <Wrench className="w-4 h-4 text-white" />
         </div>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-lg text-white tracking-wide">FixMaster <span className="text-cyan-400 text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800 font-mono">v2.0 POS</span></h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-bold text-base md:text-lg text-white tracking-wide">FixMaster <span className="text-cyan-400 text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800 font-mono">v2.0 POS</span></h1>
           </div>
-          <p className="text-xs text-slate-400 hidden sm:block">Point of Sale & Repair Management System</p>
+          <p className="text-[11px] text-slate-400 hidden sm:block">Point of Sale & Repair Management System</p>
         </div>
       </div>
 
@@ -72,19 +86,30 @@ export default function Navbar() {
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Instant Live Update Sync Button */}
+        <button
+          onClick={handleSyncUpdates}
+          disabled={isUpdating}
+          className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950 transition-all cursor-pointer"
+          title="Sync Latest System Updates from Cloud"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+          <span className="text-[11px] sm:text-xs">{isUpdating ? 'Syncing...' : 'Sync Update'}</span>
+        </button>
+
         <button
           onClick={handleInstallPwa}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 transition-all cursor-pointer"
+          className="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 transition-all cursor-pointer"
           title="Install App on Android / iOS / Windows Desktop"
         >
           <Smartphone className="w-4 h-4 text-cyan-400" />
-          <span className="hidden sm:inline">{isPwaInstalled ? 'PWA Installed' : 'Install App'}</span>
+          <span className="hidden md:inline">{isPwaInstalled ? 'App Installed' : 'Install App'}</span>
         </button>
 
-        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-3 py-1.5 rounded-lg">
+        <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2.5 py-1.5 rounded-lg">
           <ShieldCheck className="w-4 h-4" />
-          <span className="hidden sm:inline">Supabase Connected</span>
+          <span className="hidden md:inline">Connected</span>
         </div>
       </div>
     </header>
