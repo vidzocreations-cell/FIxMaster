@@ -15,8 +15,10 @@ export default function SettingsPage() {
     const prof = getStoredProfile();
     setProfile(prof);
     if (typeof window !== 'undefined') {
-      setSbUrl(localStorage.getItem('fixmaster_sb_url') || '');
-      setSbKey(localStorage.getItem('fixmaster_sb_key') || '');
+      const defaultUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://emvbsjturokhyjpeoiiv.supabase.co';
+      const defaultKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
+      setSbUrl(localStorage.getItem('fixmaster_sb_url') || defaultUrl);
+      setSbKey(localStorage.getItem('fixmaster_sb_key') || defaultKey);
     }
   }, []);
 
@@ -110,13 +112,13 @@ export default function SettingsPage() {
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Link2 className="w-4 h-4 text-cyan-400" /> Supabase Realtime Database Credentials
           </h2>
-          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">
-            Live Sync Ready
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" /> Live Sync Active
           </span>
         </div>
 
         <p className="text-xs text-slate-400">
-          Enter your Supabase Project URL and Anon API Key below to broadcast data live between Mobile Phones and PC Terminals.
+          Your Supabase Cloud Credentials are auto-configured across all Mobile & PC devices for real-time synchronization.
         </p>
 
         <div className="space-y-3 text-xs">
