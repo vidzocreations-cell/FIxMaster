@@ -21,8 +21,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [brandModel, setBrandModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [reportedFault, setReportedFault] = useState('');
-  const [laborCharge, setLaborCharge] = useState(1500);
-  const [advanceDeposit, setAdvanceDeposit] = useState(0);
+  const [laborCharge, setLaborCharge] = useState<number | ''>(1500);
+  const [advanceDeposit, setAdvanceDeposit] = useState<number | ''>('');
   const [assignedTechnician, setAssignedTechnician] = useState('');
   const [techniciansList, setTechniciansList] = useState<Technician[]>([]);
 
@@ -54,13 +54,13 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setSerialNumber(jobToEdit.serial_number || '');
       setReportedFault(jobToEdit.reported_fault);
       setLaborCharge(jobToEdit.labor_charge);
-      setAdvanceDeposit(jobToEdit.advance_deposit || 0);
+      setAdvanceDeposit(jobToEdit.advance_deposit ? jobToEdit.advance_deposit : '');
       setAssignedTechnician(jobToEdit.assigned_technician_name || (techs[0]?.name ?? 'Saman Kumara'));
       setHasExternalParts(!!jobToEdit.has_external_parts);
       setExtShopName(jobToEdit.ext_shop_name || '');
       setExtPartName(jobToEdit.ext_part_name || '');
-      setExtCostPrice(jobToEdit.ext_cost_price ?? '');
-      setExtSellingPrice(jobToEdit.ext_selling_price ?? '');
+      setExtCostPrice(jobToEdit.ext_cost_price ? jobToEdit.ext_cost_price : '');
+      setExtSellingPrice(jobToEdit.ext_selling_price ? jobToEdit.ext_selling_price : '');
     } else {
       setCustomerName('');
       setPhoneNumber('');
@@ -69,7 +69,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setSerialNumber('');
       setReportedFault('');
       setLaborCharge(1500);
-      setAdvanceDeposit(0);
+      setAdvanceDeposit('');
       setAssignedTechnician(techs[0]?.name ?? 'Saman Kumara');
       setHasExternalParts(false);
       setExtShopName('');
@@ -81,10 +81,11 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
   if (!isOpen || !mounted) return null;
 
-  const handleCostPriceChange = (val: number) => {
+  const handleCostPriceChange = (val: number | '') => {
     setExtCostPrice(val);
-    if (val > 0 && (extSellingPrice === '' || extSellingPrice === 0)) {
-      setExtSellingPrice(Math.round(val + val * 0.3));
+    const num = Number(val) || 0;
+    if (num > 0 && (extSellingPrice === '' || extSellingPrice === 0)) {
+      setExtSellingPrice(Math.round(num + num * 0.3));
     }
   };
 
@@ -95,6 +96,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     const costNum = Number(extCostPrice) || 0;
     const sellingNum = Number(extSellingPrice) || 0;
     const computedMargin = costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0;
+    const laborNum = Number(laborCharge) || 0;
+    const depositNum = Number(advanceDeposit) || 0;
 
     if (jobToEdit) {
       const updated = jobs.map((j) => {
@@ -129,9 +132,9 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
             brand_model: brandModel,
             serial_number: serialNumber,
             reported_fault: reportedFault,
-            labor_charge: Number(laborCharge),
-            advance_deposit: Number(advanceDeposit),
-            total_amount: partsTotal + Number(laborCharge),
+            labor_charge: laborNum,
+            advance_deposit: depositNum,
+            total_amount: partsTotal + laborNum,
             assigned_technician_name: assignedTechnician,
             has_external_parts: hasExternalParts,
             ext_shop_name: extShopName,
@@ -168,7 +171,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       }
 
       const partsTotal = initialParts.reduce((acc, p) => acc + p.total_price, 0);
-      const grandTotal = partsTotal + Number(laborCharge);
+      const grandTotal = partsTotal + laborNum;
 
       const newJob: JobCard = {
         id: newJobId,
@@ -180,8 +183,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         serial_number: serialNumber,
         reported_fault: reportedFault,
         status: 'Pending',
-        labor_charge: Number(laborCharge),
-        advance_deposit: Number(advanceDeposit),
+        labor_charge: laborNum,
+        advance_deposit: depositNum,
         total_amount: grandTotal,
         assigned_technician_name: assignedTechnician,
         has_external_parts: hasExternalParts,
@@ -356,7 +359,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
             </div>
 
             {hasExternalParts && (
-              <div className="space-y-3 pt-2 border-t border-amber-900/40 text-xs animate-in fade-in duration-200">
+              <div className="space-y-3 pt-2 border-amber-900/40 text-xs animate-in fade-in duration-200 border-t">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Outside Shop Name (පිට කඩේ නම)</label>
@@ -391,7 +394,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       type="number"
                       min="0"
                       value={extCostPrice}
-                      onChange={(e) => handleCostPriceChange(Number(e.target.value))}
+                      onChange={(e) => handleCostPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
                       placeholder="e.g. 2500"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
                     />
@@ -403,7 +407,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       type="number"
                       min="0"
                       value={extSellingPrice}
-                      onChange={(e) => setExtSellingPrice(Number(e.target.value))}
+                      onChange={(e) => setExtSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
                       placeholder="e.g. 3250"
                       className="w-full bg-slate-950 border border-emerald-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                     />
@@ -423,7 +428,9 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   type="number"
                   min="0"
                   value={laborCharge}
-                  onChange={(e) => setLaborCharge(Number(e.target.value))}
+                  onChange={(e) => setLaborCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="e.g. 1500"
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
               </div>
@@ -437,7 +444,9 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   type="number"
                   min="0"
                   value={advanceDeposit}
-                  onChange={(e) => setAdvanceDeposit(Number(e.target.value))}
+                  onChange={(e) => setAdvanceDeposit(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="e.g. 500"
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                 />
               </div>

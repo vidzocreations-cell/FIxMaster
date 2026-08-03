@@ -52,8 +52,9 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
 
   if (!isOpen || !mounted) return null;
 
-  const handleCostPriceChange = (costVal: number) => {
-    setCostPrice(costVal);
+  const handleCostPriceChange = (val: number | '') => {
+    setCostPrice(val);
+    const costVal = Number(val) || 0;
     const currMargin = Number(marginPercent) || 0;
     if (costVal > 0 && currMargin >= 0) {
       const computedRetail = Number((costVal + (costVal * currMargin) / 100).toFixed(2));
@@ -61,8 +62,9 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     }
   };
 
-  const handleRetailPriceChange = (retailVal: number) => {
-    setRetailPrice(retailVal);
+  const handleRetailPriceChange = (val: number | '') => {
+    setRetailPrice(val);
+    const retailVal = Number(val) || 0;
     const currCost = Number(costPrice) || 0;
     if (currCost > 0 && retailVal >= 0) {
       const computedMargin = Number((((retailVal - currCost) / currCost) * 100).toFixed(2));
@@ -70,8 +72,9 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     }
   };
 
-  const handleMarginPercentChange = (marginVal: number) => {
-    setMarginPercent(marginVal);
+  const handleMarginPercentChange = (val: number | '') => {
+    setMarginPercent(val);
+    const marginVal = Number(val) || 0;
     const currCost = Number(costPrice) || 0;
     if (currCost > 0) {
       const computedRetail = Number((currCost + (currCost * marginVal) / 100).toFixed(2));
@@ -212,7 +215,8 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   min="0"
                   required
                   value={costPrice}
-                  onChange={(e) => handleCostPriceChange(Number(e.target.value))}
+                  onChange={(e) => handleCostPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   placeholder="500"
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
                 />
@@ -226,7 +230,8 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   min="0"
                   required
                   value={retailPrice}
-                  onChange={(e) => handleRetailPriceChange(Number(e.target.value))}
+                  onChange={(e) => handleRetailPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   placeholder="650"
                   className="w-full bg-slate-900 border border-emerald-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
@@ -241,7 +246,8 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                     step="0.01"
                     required
                     value={marginPercent}
-                    onChange={(e) => handleMarginPercentChange(Number(e.target.value))}
+                    onChange={(e) => handleMarginPercentChange(e.target.value === '' ? '' : Number(e.target.value))}
+                    onFocus={(e) => e.target.select()}
                     placeholder="30"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono focus:border-cyan-500 focus:outline-none pr-6"
                   />
@@ -260,7 +266,8 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 min="0"
                 required
                 value={stockQuantity}
-                onChange={(e) => setStockQuantity(Number(e.target.value))}
+                onChange={(e) => setStockQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
@@ -274,7 +281,8 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   min="1"
                   required
                   value={minStockAlert}
-                  onChange={(e) => setMinStockAlert(Number(e.target.value))}
+                  onChange={(e) => setMinStockAlert(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>

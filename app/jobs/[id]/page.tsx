@@ -24,19 +24,19 @@ export default function JobDetailPage() {
 
   // Stock Part Selection State
   const [selectedPartId, setSelectedPartId] = useState('');
-  const [partQty, setPartQty] = useState(1);
+  const [partQty, setPartQty] = useState<number | ''>(1);
 
   // External / Outside Shop Part State (පිට කඩෙන් ගෙනා කොටස්)
   const [extPartName, setExtPartName] = useState('');
-  const [extCostPrice, setExtCostPrice] = useState<number>(2000);
-  const [extMarginPercent, setExtMarginPercent] = useState<number>(30);
+  const [extCostPrice, setExtCostPrice] = useState<number | ''>(2000);
+  const [extMarginPercent, setExtMarginPercent] = useState<number | ''>(30);
   const [extVendorName, setExtVendorName] = useState('');
-  const [extQty, setExtQty] = useState<number>(1);
+  const [extQty, setExtQty] = useState<number | ''>(1);
   const [extSaveToInventory, setExtSaveToInventory] = useState(false);
 
   // Financials State
-  const [laborCharge, setLaborCharge] = useState(0);
-  const [advanceDeposit, setAdvanceDeposit] = useState(0);
+  const [laborCharge, setLaborCharge] = useState<number | ''>(0);
+  const [advanceDeposit, setAdvanceDeposit] = useState<number | ''>(0);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const loadJobData = () => {
@@ -84,7 +84,8 @@ export default function JobDetailPage() {
     const partObj = availableParts.find((p) => p.id === selectedPartId);
     if (!partObj) return;
 
-    if (partObj.stock_quantity < partQty) {
+    const qtyNum = Number(partQty) || 1;
+    if (partObj.stock_quantity < qtyNum) {
       alert(`Insufficient stock! Only ${partObj.stock_quantity} in stock.`);
       return;
     }
@@ -92,7 +93,7 @@ export default function JobDetailPage() {
     // Deduct stock from inventory
     const updatedInventory = availableParts.map((p) => {
       if (p.id === selectedPartId) {
-        return { ...p, stock_quantity: p.stock_quantity - partQty };
+        return { ...p, stock_quantity: p.stock_quantity - qtyNum };
       }
       return p;
     });
@@ -106,9 +107,9 @@ export default function JobDetailPage() {
       job_card_id: job.id,
       part_id: partObj.id,
       part_name: partObj.part_name,
-      quantity: Number(partQty),
+      quantity: qtyNum,
       unit_price: partObj.retail_price,
-      total_price: partObj.retail_price * Number(partQty),
+      total_price: partObj.retail_price * qtyNum,
       cost_price: partObj.cost_price,
       margin_percent: partObj.margin_percent,
       is_external: false,
@@ -144,8 +145,11 @@ export default function JobDetailPage() {
       return;
     }
 
-    const computedRetail = Number((extCostPrice + (extCostPrice * extMarginPercent) / 100).toFixed(2));
-    const totalPrice = computedRetail * extQty;
+    const costNum = Number(extCostPrice) || 0;
+    const marginNum = Number(extMarginPercent) || 0;
+    const qtyNum = Number(extQty) || 1;
+    const computedRetail = Number((costNum + (costNum * marginNum) / 100).toFixed(2));
+    const totalPrice = computedRetail * qtyNum;
 
     // Optional: Save to shop inventory catalog for future use
     let externalPartId = 'ext-part-' + Date.now();
@@ -155,8 +159,8 @@ export default function JobDetailPage() {
         part_name: extPartName,
         category: job.machine_category,
         vendor_name: extVendorName || 'Outside Shop Vendor',
-        cost_price: Number(extCostPrice),
-        margin_percent: Number(extMarginPercent),
+        cost_price: costNum,
+        margin_percent: marginNum,
         retail_price: computedRetail,
         stock_quantity: 0, // Since it's purchased for this job
         min_stock_alert: 3,
@@ -173,11 +177,11 @@ export default function JobDetailPage() {
       job_card_id: job.id,
       part_id: externalPartId,
       part_name: `${extPartName} (Outside Purchase)`,
-      quantity: Number(extQty),
+      quantity: qtyNum,
       unit_price: computedRetail,
       total_price: totalPrice,
-      cost_price: Number(extCostPrice),
-      margin_percent: Number(extMarginPercent),
+      cost_price: costNum,
+      margin_percent: marginNum,
       is_external: true,
       vendor_name: extVendorName || 'Outside Shop',
       warranty_days: 30,
@@ -249,15 +253,17 @@ export default function JobDetailPage() {
   // Save Labor & Deposit changes
   const handleSaveFinancials = () => {
     const partsTotal = job.parts ? job.parts.reduce((a, b) => a + b.total_price, 0) : 0;
-    const newTotal = partsTotal + Number(laborCharge);
+    const laborNum = Number(laborCharge) || 0;
+    const depositNum = Number(advanceDeposit) || 0;
+    const newTotal = partsTotal + laborNum;
 
     const jobs = getStoredJobs();
     const updatedJobs = jobs.map((j) => {
       if (j.id === job.id) {
         return {
           ...j,
-          labor_charge: Number(laborCharge),
-          advance_deposit: Number(advanceDeposit),
+          labor_charge: laborNum,
+          advance_deposit: depositNum,
           total_amount: newTotal,
           updated_at: new Date().toISOString(),
         };
@@ -266,16 +272,18 @@ export default function JobDetailPage() {
     });
 
     saveStoredJobs(updatedJobs);
-    setJob({ ...job, labor_charge: Number(laborCharge), advance_deposit: Number(advanceDeposit), total_amount: newTotal });
+    setJob({ ...job, labor_charge: laborNum, advance_deposit: depositNum, total_amount: newTotal });
     alert('Labor charge & deposit updated successfully!');
   };
 
   const partsTotal = job.parts ? job.parts.reduce((a, b) => a + b.total_price, 0) : 0;
-  const grandTotal = partsTotal + Number(laborCharge);
+  const laborNum = Number(laborCharge) || 0;
+  const grandTotal = partsTotal + laborNum;
   const profile = getStoredProfile();
 
-  // Computed retail price for external preview
-  const extComputedRetail = Number((extCostPrice + (extCostPrice * extMarginPercent) / 100).toFixed(2));
+  const costNum = Number(extCostPrice) || 0;
+  const marginNum = Number(extMarginPercent) || 0;
+  const extComputedRetail = Number((costNum + (costNum * marginNum) / 100).toFixed(2));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -492,7 +500,8 @@ export default function JobDetailPage() {
                     type="number"
                     min="1"
                     value={partQty}
-                    onChange={(e) => setPartQty(Number(e.target.value))}
+                    onChange={(e) => setPartQty(e.target.value === '' ? '' : Number(e.target.value))}
+                    onFocus={(e) => e.target.select()}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
@@ -534,7 +543,8 @@ export default function JobDetailPage() {
                       min="0"
                       required
                       value={extCostPrice}
-                      onChange={(e) => setExtCostPrice(Number(e.target.value))}
+                      onChange={(e) => setExtCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
                     />
                   </div>
@@ -547,7 +557,8 @@ export default function JobDetailPage() {
                         min="0"
                         required
                         value={extMarginPercent}
-                        onChange={(e) => setExtMarginPercent(Number(e.target.value))}
+                        onChange={(e) => setExtMarginPercent(e.target.value === '' ? '' : Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-mono focus:border-amber-500 focus:outline-none"
                       />
                       <Percent className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
@@ -581,7 +592,8 @@ export default function JobDetailPage() {
                       type="number"
                       min="1"
                       value={extQty}
-                      onChange={(e) => setExtQty(Number(e.target.value))}
+                      onChange={(e) => setExtQty(e.target.value === '' ? '' : Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                     />
                   </div>
@@ -623,7 +635,8 @@ export default function JobDetailPage() {
                   type="number"
                   min="0"
                   value={laborCharge}
-                  onChange={(e) => setLaborCharge(Number(e.target.value))}
+                  onChange={(e) => setLaborCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
               </div>
@@ -634,7 +647,8 @@ export default function JobDetailPage() {
                   type="number"
                   min="0"
                   value={advanceDeposit}
-                  onChange={(e) => setAdvanceDeposit(Number(e.target.value))}
+                  onChange={(e) => setAdvanceDeposit(e.target.value === '' ? '' : Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-cyan-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                 />
               </div>
