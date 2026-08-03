@@ -1,0 +1,447 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store } from 'lucide-react';
+import { EQUIPMENT_CATEGORIES, JobCard, EquipmentCategory, JobPart } from '@/lib/types';
+import { getStoredJobs, saveStoredJobs } from '@/lib/supabase';
+
+interface JobCardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  jobToEdit?: JobCard | null;
+  onSaved: () => void;
+}
+
+export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: JobCardModalProps) {
+  const [customerName, setCustomerName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [machineCategory, setMachineCategory] = useState<EquipmentCategory>('Chainsaws');
+  const [brandModel, setBrandModel] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [reportedFault, setReportedFault] = useState('');
+  const [laborCharge, setLaborCharge] = useState(1500);
+  const [advanceDeposit, setAdvanceDeposit] = useState(0);
+  const [assignedTechnician, setAssignedTechnician] = useState('Saman Kumara');
+
+  // Outside Shop Parts Fields (පිට කඩෙන් ගෙනා කොටස්)
+  const [hasExternalParts, setHasExternalParts] = useState(false);
+  const [extShopName, setExtShopName] = useState('');
+  const [extPartName, setExtPartName] = useState('');
+  const [extCostPrice, setExtCostPrice] = useState<number | ''>('');
+  const [extSellingPrice, setExtSellingPrice] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (jobToEdit) {
+      setCustomerName(jobToEdit.customer_name);
+      setPhoneNumber(jobToEdit.phone_number);
+      setMachineCategory(jobToEdit.machine_category as EquipmentCategory);
+      setBrandModel(jobToEdit.brand_model);
+      setSerialNumber(jobToEdit.serial_number || '');
+      setReportedFault(jobToEdit.reported_fault);
+      setLaborCharge(jobToEdit.labor_charge);
+      setAdvanceDeposit(jobToEdit.advance_deposit || 0);
+      setAssignedTechnician(jobToEdit.assigned_technician_name || 'Saman Kumara');
+      setHasExternalParts(!!jobToEdit.has_external_parts);
+      setExtShopName(jobToEdit.ext_shop_name || '');
+      setExtPartName(jobToEdit.ext_part_name || '');
+      setExtCostPrice(jobToEdit.ext_cost_price ?? '');
+      setExtSellingPrice(jobToEdit.ext_selling_price ?? '');
+    } else {
+      setCustomerName('');
+      setPhoneNumber('');
+      setMachineCategory('Chainsaws');
+      setBrandModel('');
+      setSerialNumber('');
+      setReportedFault('');
+      setLaborCharge(1500);
+      setAdvanceDeposit(0);
+      setAssignedTechnician('Saman Kumara');
+      setHasExternalParts(false);
+      setExtShopName('');
+      setExtPartName('');
+      setExtCostPrice('');
+      setExtSellingPrice('');
+    }
+  }, [jobToEdit, isOpen]);
+
+  if (!isOpen) return null;
+
+  // Auto calculate default selling price when cost price is typed if selling price is empty
+  const handleCostPriceChange = (val: number) => {
+    setExtCostPrice(val);
+    if (val > 0 && (extSellingPrice === '' || extSellingPrice === 0)) {
+      setExtSellingPrice(Math.round(val + val * 0.3)); // Default 30% margin
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const jobs = getStoredJobs();
+
+    const costNum = Number(extCostPrice) || 0;
+    const sellingNum = Number(extSellingPrice) || 0;
+    const computedMargin = costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0;
+
+    if (jobToEdit) {
+      const updated = jobs.map((j) => {
+        if (j.id === jobToEdit.id) {
+          let updatedParts = j.parts || [];
+
+          // If external part info is filled, attach it to parts list if not already present
+          if (hasExternalParts && extPartName.trim() && sellingNum > 0) {
+            const extJobPart: JobPart = {
+              id: 'jp-ext-' + Date.now(),
+              job_card_id: j.id,
+              part_id: 'ext-part-' + Date.now(),
+              part_name: `${extPartName} (Outside Shop)`,
+              quantity: 1,
+              unit_price: sellingNum,
+              total_price: sellingNum,
+              cost_price: costNum,
+              margin_percent: computedMargin,
+              is_external: true,
+              vendor_name: extShopName || 'Outside Shop',
+              warranty_days: 30,
+            };
+            updatedParts = [...updatedParts, extJobPart];
+          }
+
+          const partsTotal = updatedParts.reduce((acc, p) => acc + p.total_price, 0);
+
+          return {
+            ...j,
+            customer_name: customerName,
+            phone_number: phoneNumber,
+            machine_category: machineCategory,
+            brand_model: brandModel,
+            serial_number: serialNumber,
+            reported_fault: reportedFault,
+            labor_charge: Number(laborCharge),
+            advance_deposit: Number(advanceDeposit),
+            total_amount: partsTotal + Number(laborCharge),
+            assigned_technician_name: assignedTechnician,
+            has_external_parts: hasExternalParts,
+            ext_shop_name: extShopName,
+            ext_part_name: extPartName,
+            ext_cost_price: costNum,
+            ext_selling_price: sellingNum,
+            parts: updatedParts,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return j;
+      });
+      saveStoredJobs(updated);
+    } else {
+      const nextNum = 1001 + jobs.length;
+      const newJobId = 'job-' + Date.now();
+      let initialParts: JobPart[] = [];
+
+      if (hasExternalParts && extPartName.trim() && sellingNum > 0) {
+        initialParts.push({
+          id: 'jp-ext-' + Date.now(),
+          job_card_id: newJobId,
+          part_id: 'ext-part-' + Date.now(),
+          part_name: `${extPartName} (Outside Shop)`,
+          quantity: 1,
+          unit_price: sellingNum,
+          total_price: sellingNum,
+          cost_price: costNum,
+          margin_percent: computedMargin,
+          is_external: true,
+          vendor_name: extShopName || 'Outside Shop',
+          warranty_days: 30,
+        });
+      }
+
+      const partsTotal = initialParts.reduce((acc, p) => acc + p.total_price, 0);
+      const grandTotal = partsTotal + Number(laborCharge);
+
+      const newJob: JobCard = {
+        id: newJobId,
+        job_no: `JOB-${nextNum}`,
+        customer_name: customerName,
+        phone_number: phoneNumber,
+        machine_category: machineCategory,
+        brand_model: brandModel,
+        serial_number: serialNumber,
+        reported_fault: reportedFault,
+        status: 'Pending',
+        labor_charge: Number(laborCharge),
+        advance_deposit: Number(advanceDeposit),
+        total_amount: grandTotal,
+        assigned_technician_name: assignedTechnician,
+        has_external_parts: hasExternalParts,
+        ext_shop_name: extShopName,
+        ext_part_name: extPartName,
+        ext_cost_price: costNum,
+        ext_selling_price: sellingNum,
+        parts: initialParts,
+        created_at: new Date().toISOString(),
+      };
+      saveStoredJobs([newJob, ...jobs]);
+    }
+
+    onSaved();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-xl glass-panel rounded-2xl border border-slate-800 p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-bold text-white">
+              {jobToEdit ? `Edit Job Card (${jobToEdit.job_no})` : 'New Repair Job Card'}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Customer Name */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  required
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="e.g. Kamal Perera"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  required
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g. 0771234567"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Equipment Category */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category / Mode *</label>
+              <div className="relative">
+                <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
+                <select
+                  value={machineCategory}
+                  onChange={(e) => setMachineCategory(e.target.value as EquipmentCategory)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
+                >
+                  {EQUIPMENT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Machine Brand & Model */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Brand & Model No. *</label>
+              <input
+                type="text"
+                required
+                value={brandModel}
+                onChange={(e) => setBrandModel(e.target.value)}
+                placeholder="e.g. Stihl MS180 / Makita GA4030"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Serial Number & Tech */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Machine Serial No. (Optional)</label>
+              <input
+                type="text"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                placeholder="e.g. SN-883920"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Assigned Technician</label>
+              <select
+                value={assignedTechnician}
+                onChange={(e) => setAssignedTechnician(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                <option value="Saman Kumara">Saman Kumara (Senior Tech)</option>
+                <option value="Ruwan Dissayake">Ruwan Dissayake (Motor Specialist)</option>
+                <option value="Kavinda Perera">Kavinda Perera (General Tech)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Reported Fault */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Reported Fault / Customer Note *</label>
+            <div className="relative">
+              <AlertCircle className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <textarea
+                required
+                rows={2}
+                value={reportedFault}
+                onChange={(e) => setReportedFault(e.target.value)}
+                placeholder="Describe fault (e.g. Engine starting issue, smoke from motor, broken switch)"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Outside Shop Parts Section (පිට කඩෙන් ගෙනා කොටස්) */}
+          <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-900/60 space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="hasExtParts"
+                checked={hasExternalParts}
+                onChange={(e) => setHasExternalParts(e.target.checked)}
+                className="rounded border-slate-800 text-amber-500 focus:ring-amber-500 cursor-pointer"
+              />
+              <label htmlFor="hasExtParts" className="text-xs font-bold text-amber-300 cursor-pointer flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" /> Mark: Outside Shop Parts Brought (පිට කඩෙන් ගෙනා කොටස් ඇත)
+              </label>
+            </div>
+
+            {hasExternalParts && (
+              <div className="space-y-3 pt-2 border-t border-amber-900/40 text-xs animate-in fade-in duration-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Outside Shop Name */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Outside Shop Name (පිට කඩේ නම)</label>
+                    <div className="relative">
+                      <Store className="w-4 h-4 text-amber-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={extShopName}
+                        onChange={(e) => setExtShopName(e.target.value)}
+                        placeholder="e.g. Pettah Hardware / Stihl Dealer"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Part Name */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Part Name (කොටසේ නම)</label>
+                    <input
+                      type="text"
+                      value={extPartName}
+                      onChange={(e) => setExtPartName(e.target.value)}
+                      placeholder="e.g. Stihl MS180 Carburetor"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Cost Price */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Outside Purchase Cost Price (LKR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={extCostPrice}
+                      onChange={(e) => handleCostPriceChange(Number(e.target.value))}
+                      placeholder="e.g. 2500"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Selling Price */}
+                  <div>
+                    <label className="block text-amber-300 font-bold mb-1">Customer Selling Price (LKR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={extSellingPrice}
+                      onChange={(e) => setExtSellingPrice(Number(e.target.value))}
+                      placeholder="e.g. 3250"
+                      className="w-full bg-slate-900 border border-emerald-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Financials: Estimated Labor Charge & Advance Deposit */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Estimated Labor Charge (LKR)</label>
+              <div className="relative">
+                <DollarSign className="w-4 h-4 text-emerald-500 absolute left-3 top-2.5" />
+                <input
+                  type="number"
+                  min="0"
+                  value={laborCharge}
+                  onChange={(e) => setLaborCharge(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Advance Deposit (LKR)</label>
+              <div className="relative">
+                <DollarSign className="w-4 h-4 text-cyan-500 absolute left-3 top-2.5" />
+                <input
+                  type="number"
+                  min="0"
+                  value={advanceDeposit}
+                  onChange={(e) => setAdvanceDeposit(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-900 border border-slate-800 hover:text-white transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+            >
+              {jobToEdit ? 'Save Changes' : 'Create Job Card'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
