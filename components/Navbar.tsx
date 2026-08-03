@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Wrench, ShieldCheck, Smartphone, RefreshCw, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Wrench, ShieldCheck, Smartphone, RefreshCw, Zap, Settings } from 'lucide-react';
 import { getStoredJobs, getStoredParts } from '@/lib/supabase';
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [pendingJobsCount, setPendingJobsCount] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
@@ -57,15 +60,19 @@ export default function Navbar() {
     <header className="h-16 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-30 px-3 md:px-6 flex items-center justify-between">
       {/* Brand & Status */}
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <Wrench className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-bold text-base md:text-lg text-white tracking-wide">FixMaster <span className="text-cyan-400 text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800 font-mono">v2.0 POS</span></h1>
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+            <Wrench className="w-4 h-4 text-white" />
           </div>
-          <p className="text-[11px] text-slate-400 hidden sm:block">Point of Sale & Repair Management System</p>
-        </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-bold text-base md:text-lg text-white tracking-wide">
+                FixMaster <span className="text-cyan-400 text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800 font-mono">v2.0 POS</span>
+              </h1>
+            </div>
+            <p className="text-[11px] text-slate-400 hidden sm:block">Point of Sale & Repair Management System</p>
+          </div>
+        </Link>
       </div>
 
       {/* Center Status Badges */}
@@ -85,7 +92,7 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Right Controls */}
+      {/* Right Controls (Upper Right Corner) */}
       <div className="flex items-center gap-2 md:gap-3">
         {/* Instant Live Update Sync Button */}
         <button
@@ -107,10 +114,18 @@ export default function Navbar() {
           <span className="hidden md:inline">{isPwaInstalled ? 'App Installed' : 'Install App'}</span>
         </button>
 
-        <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2.5 py-1.5 rounded-lg">
-          <ShieldCheck className="w-4 h-4" />
-          <span className="hidden md:inline">Connected</span>
-        </div>
+        {/* Upper Right Corner Settings Icon Button */}
+        <Link
+          href="/settings"
+          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+            pathname === '/settings'
+              ? 'bg-gradient-to-r from-cyan-600 to-cyan-700 text-white border-cyan-400 shadow-md shadow-cyan-900/50'
+              : 'bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-800'
+          }`}
+          title="Settings & Cloud Config"
+        >
+          <Settings className="w-4 h-4" />
+        </Link>
       </div>
     </header>
   );

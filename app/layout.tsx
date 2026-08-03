@@ -31,9 +31,9 @@ export default function RootLayout({
       </head>
       <body className="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" suppressHydrationWarning>
         <Navbar />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-6 space-y-6">
             {children}
           </main>
         </div>
