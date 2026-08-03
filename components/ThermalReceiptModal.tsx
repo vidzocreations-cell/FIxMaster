@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, Wrench, Phone, MapPin, CheckCircle2, QrCode } from 'lucide-react';
-import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
+import { Invoice, JobCard, BusinessProfile, JobPart } from '@/lib/types';
+import { getStoredJobs } from '@/lib/supabase';
 
 interface ThermalReceiptModalProps {
   isOpen: boolean;
@@ -26,17 +27,43 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
     window.print();
   };
 
-  const targetJob = jobCard || invoice?.job_card;
-  const parts = targetJob?.parts || [];
+  // Find job card either directly or via stored jobs matching invoice
+  let targetJob: JobCard | null | undefined = jobCard || invoice?.job_card;
+  if (!targetJob && invoice) {
+    const allJobs = getStoredJobs();
+    targetJob = allJobs.find(j => j.id === invoice.job_card_id || j.customer_name === invoice.customer_name);
+  }
+
+  let parts: JobPart[] = targetJob?.parts || [];
+
+  // Fallback: If parts array is empty but ext_part_name exists, construct the outside shop part
+  if (parts.length === 0 && targetJob?.ext_part_name) {
+    const sellingNum = targetJob.ext_selling_price || targetJob.ext_cost_price || 0;
+    parts = [{
+      id: 'ext-' + (targetJob.id || '1'),
+      job_card_id: targetJob.id || '',
+      part_id: 'ext-part',
+      part_name: `${targetJob.ext_part_name} (Outside Shop)`,
+      quantity: 1,
+      unit_price: sellingNum,
+      total_price: sellingNum,
+      cost_price: targetJob.ext_cost_price || 0,
+      margin_percent: 0,
+      is_external: true
+    }];
+  }
+
   const labor = targetJob?.labor_charge || 0;
   const deposit = targetJob?.advance_deposit || 0;
   const docNo = invoice ? invoice.invoice_no : targetJob?.job_no || 'TICKET-001';
-  const createdDate = invoice ? new Date(invoice.created_at) : new Date();
+  const createdDate = invoice ? new Date(invoice.created_at) : (targetJob ? new Date(targetJob.created_at) : new Date());
 
   const partsTotal = parts.reduce((a, b) => a + b.total_price, 0);
-  const subtotal = invoice ? invoice.subtotal : partsTotal + labor;
+  const subtotal = invoice ? invoice.subtotal : (partsTotal + labor);
   const discount = invoice ? invoice.discount : 0;
   const netPayable = invoice ? invoice.net_payable : Math.max(0, subtotal - deposit - discount);
+
+  const currencyStr = profile.currency || 'LKR';
 
   const modalContent = (
     <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-0 sm:p-6 flex items-start sm:items-center justify-center min-h-screen">
@@ -67,16 +94,16 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
           </div>
 
           {/* Document Title & Number */}
-          <div className="text-center py-1 bg-gray-100 border-y border-black font-extrabold text-xs uppercase tracking-widest">
+          <div className="text-center py-1 bg-gray-100 border-y border-black font-extrabold text-xs uppercase tracking-widest text-black">
             {invoice ? 'TAX INVOICE / RECEIPT' : 'REPAIR SERVICE JOB TICKET'}
           </div>
 
           {/* Receipt Info Grid */}
-          <div className="grid grid-cols-2 text-[11px] py-1 border-b border-dashed border-gray-400 gap-1">
+          <div className="grid grid-cols-2 text-[11px] py-1 border-b border-dashed border-gray-400 gap-1 text-black">
             <div>
               <p><span className="font-bold">Doc No:</span> {docNo}</p>
-              <p><span className="font-bold">Cust:</span> {targetJob?.customer_name || invoice?.customer_name}</p>
-              <p><span className="font-bold">Phone:</span> {targetJob?.phone_number || invoice?.phone_number}</p>
+              <p><span className="font-bold">Cust:</span> {targetJob?.customer_name || invoice?.customer_name || 'Customer'}</p>
+              <p><span className="font-bold">Phone:</span> {targetJob?.phone_number || invoice?.phone_number || '-'}</p>
             </div>
             <div className="text-right">
               <p><span className="font-bold">Date:</span> {createdDate.toLocaleDateString()}</p>
@@ -87,8 +114,8 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
 
           {/* Machine Info */}
           {targetJob && (
-            <div className="p-2 bg-gray-100 rounded border border-gray-300 text-[11px] space-y-0.5">
-              <div className="flex justify-between font-bold text-black">
+            <div className="p-2 bg-gray-100 rounded border border-gray-300 text-[11px] space-y-0.5 text-black">
+              <div className="flex justify-between font-bold">
                 <span>{targetJob.machine_category}</span>
                 <span>{targetJob.brand_model}</span>
               </div>
@@ -101,54 +128,62 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
           <div className="py-1">
             <table className="w-full text-[11px] text-left border-collapse">
               <thead>
-                <tr className="border-b-2 border-black font-bold uppercase text-[10px]">
+                <tr className="border-b-2 border-black font-bold uppercase text-[10px] text-black">
                   <th className="py-1">Item / Description</th>
                   <th className="py-1 text-center">Qty</th>
                   <th className="py-1 text-right">Price</th>
-                  <th className="py-1 text-right">Total</th>
+                  <th className="py-1 text-right">Total ({currencyStr})</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {parts.map((p, idx) => (
-                  <tr key={p.id || idx}>
-                    <td className="py-1 text-black font-medium">{p.part_name}</td>
-                    <td className="py-1 text-center">{p.quantity}</td>
-                    <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
-                    <td className="py-1 text-right font-bold">{p.total_price.toLocaleString()}</td>
+              <tbody className="divide-y divide-gray-200 text-black">
+                {parts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-1.5 text-center text-gray-500 italic text-[10px]">
+                      (No Spare Parts Charged)
+                    </td>
                   </tr>
-                ))}
-                <tr>
-                  <td className="py-1 font-bold text-black" colSpan={3}>Service & Labor Charge</td>
-                  <td className="py-1 text-right font-bold">{labor.toLocaleString()}</td>
+                ) : (
+                  parts.map((p, idx) => (
+                    <tr key={p.id || idx}>
+                      <td className="py-1 text-black font-medium">{p.part_name}</td>
+                      <td className="py-1 text-center">{p.quantity}</td>
+                      <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
+                      <td className="py-1 text-right font-bold">{p.total_price.toLocaleString()}</td>
+                    </tr>
+                  ))
+                )}
+                <tr className="border-t border-gray-300">
+                  <td className="py-1.5 font-bold text-black" colSpan={3}>Service & Labor Charge</td>
+                  <td className="py-1.5 text-right font-bold">{labor.toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           {/* Financial Totals */}
-          <div className="border-t-2 border-dashed border-black pt-2 space-y-1 text-right text-[11px]">
+          <div className="border-t-2 border-dashed border-black pt-2 space-y-1 text-right text-[11px] text-black">
             <div className="flex justify-between">
               <span>Gross Subtotal:</span>
-              <span className="font-bold">{profile.currency || 'LKR'} {subtotal.toLocaleString()}</span>
+              <span className="font-bold">{currencyStr} {subtotal.toLocaleString()}</span>
             </div>
 
             {deposit > 0 && (
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between font-bold text-black">
                 <span>Advance Deposit Paid:</span>
-                <span>- {profile.currency || 'LKR'} {deposit.toLocaleString()}</span>
+                <span>- {currencyStr} {deposit.toLocaleString()}</span>
               </div>
             )}
 
             {discount > 0 && (
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between font-bold text-black">
                 <span>Discount Allowed:</span>
-                <span>- {profile.currency || 'LKR'} {discount.toLocaleString()}</span>
+                <span>- {currencyStr} {discount.toLocaleString()}</span>
               </div>
             )}
 
-            <div className="flex justify-between font-extrabold text-sm sm:text-base border-t-2 border-black pt-1 mt-1 text-black">
+            <div className="flex justify-between font-extrabold text-sm sm:text-base border-t-2 border-black pt-1.5 mt-1 text-black">
               <span>NET PAYABLE:</span>
-              <span>{profile.currency || 'LKR'} {netPayable.toLocaleString()}</span>
+              <span>{currencyStr} {netPayable.toLocaleString()}</span>
             </div>
 
             {invoice && (
@@ -160,7 +195,7 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
           </div>
 
           {/* Terms & Barcode Visual */}
-          <div className="text-center text-[10px] border-t border-dashed border-black pt-3 space-y-2">
+          <div className="text-center text-[10px] border-t border-dashed border-black pt-3 space-y-2 text-black">
             <p className="font-bold">{profile.receipt_footer_note || '*** THANK YOU FOR YOUR BUSINESS ***'}</p>
             <p className="text-[9px] text-gray-700">{profile.receipt_terms || '30-day warranty applies to replaced parts with this original receipt.'}</p>
             
