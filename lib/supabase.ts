@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { JobCard, Part, Invoice, BusinessProfile } from './types';
 
 const HARDCODED_SUPABASE_URL = 'https://emvbsjturokhyjpeoiiv.supabase.co';
-const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
+const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-LypOTejP6u60giaxA_sk76E7d9';
 
 const INITIAL_BUSINESS_PROFILE: BusinessProfile = {
   shop_name: 'FixMaster Repair & Hardware POS',
@@ -40,30 +40,6 @@ const INITIAL_PARTS: Part[] = [
     min_stock_alert: 3,
     created_at: new Date().toISOString(),
   },
-  {
-    id: 'part-3',
-    part_name: 'Water Pump Mechanical Seal 2"',
-    category: 'Petrol / Diesel Water Pumps',
-    vendor_name: 'Lanka Hardware Tech',
-    cost_price: 1200,
-    margin_percent: 40,
-    retail_price: 1680,
-    stock_quantity: 12,
-    min_stock_alert: 4,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'part-4',
-    part_name: 'Angle Grinder Carbon Brush Set',
-    category: 'Cutting Machines / Angle Grinders',
-    vendor_name: 'Bosch Parts Center',
-    cost_price: 350,
-    margin_percent: 60,
-    retail_price: 560,
-    stock_quantity: 40,
-    min_stock_alert: 10,
-    created_at: new Date().toISOString(),
-  },
 ];
 
 const INITIAL_JOBS: JobCard[] = [
@@ -81,36 +57,8 @@ const INITIAL_JOBS: JobCard[] = [
     advance_deposit: 500,
     total_amount: 2100,
     assigned_technician_name: 'Saman Kumara',
-    parts: [
-      {
-        id: 'jp-1',
-        job_card_id: 'job-1',
-        part_id: 'part-1',
-        part_name: 'Chainsaw Spark Plug (L7T)',
-        quantity: 1,
-        unit_price: 600,
-        total_price: 600,
-        warranty_days: 30,
-      },
-    ],
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: 'job-2',
-    job_no: 'JOB-1002',
-    customer_name: 'Nimal Silva',
-    phone_number: '0719876543',
-    machine_category: 'Brush Cutters',
-    brand_model: 'Honda GX35',
-    serial_number: 'GX-44512',
-    reported_fault: 'Carburetor overflow & low speed vibration',
-    status: 'Pending',
-    labor_charge: 2000,
-    advance_deposit: 0,
-    total_amount: 2000,
-    assigned_technician_name: 'Ruwan Dissayake',
     parts: [],
-    created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
   },
 ];
 
@@ -126,8 +74,8 @@ export function getSupabaseClient() {
   if (!url || url.includes('your-supabase-project')) {
     url = (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '') || HARDCODED_SUPABASE_URL;
   }
-  if (!key || key.includes('your-supabase-anon-key')) {
-    key = (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_key') : '') || HARDCODED_SUPABASE_KEY;
+  if (!key || key.includes('your-supabase-anon-key') || key.includes('Lyp0TejP')) {
+    key = HARDCODED_SUPABASE_KEY;
   }
 
   if (url && key) {
