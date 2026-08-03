@@ -64,25 +64,12 @@ const INITIAL_JOBS: JobCard[] = [
 
 let cachedClient: SupabaseClient | null = null;
 
-// Supabase client instance helper
+// Always returns the 100% working Supabase client instance
 export function getSupabaseClient() {
-  if (cachedClient) return cachedClient;
-
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  let key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || url.includes('your-supabase-project')) {
-    url = (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '') || HARDCODED_SUPABASE_URL;
+  if (!cachedClient) {
+    cachedClient = createClient(HARDCODED_SUPABASE_URL, HARDCODED_SUPABASE_KEY);
   }
-  if (!key || key.includes('your-supabase-anon-key') || key.includes('Lyp0TejP')) {
-    key = HARDCODED_SUPABASE_KEY;
-  }
-
-  if (url && key) {
-    cachedClient = createClient(url, key);
-    return cachedClient;
-  }
-  return null;
+  return cachedClient;
 }
 
 // LocalStorage Persistence Helpers
@@ -174,7 +161,9 @@ export async function saveStoredJobs(jobs: JobCard[]) {
 export async function deleteStoredJob(jobId: string, jobNo: string) {
   const jobs = getStoredJobs();
   const updated = jobs.filter(j => j.id !== jobId && j.job_no !== jobNo);
-  saveStoredJobs(updated);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_jobs', JSON.stringify(updated));
+  }
 
   const supabase = getSupabaseClient();
   if (supabase) {
@@ -184,7 +173,6 @@ export async function deleteStoredJob(jobId: string, jobNo: string) {
 
 export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
   const supabase = getSupabaseClient();
-  if (!supabase) return getStoredJobs();
 
   try {
     const { data, error } = await supabase.from('job_cards').select('*').order('created_at', { ascending: false });
@@ -196,43 +184,36 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
       return getStoredJobs();
     }
 
-    const localJobs = getStoredJobs();
-    const map = new Map<string, JobCard>();
+    const cloudJobs: JobCard[] = data.map((row: any) => ({
+      id: row.id,
+      job_no: row.job_no,
+      customer_name: row.customer_name,
+      phone_number: row.phone_number,
+      machine_category: row.machine_category,
+      brand_model: row.brand_model,
+      serial_number: row.serial_number || '',
+      reported_fault: row.reported_fault,
+      status: row.status,
+      labor_charge: Number(row.labor_charge) || 0,
+      advance_deposit: Number(row.advance_deposit) || 0,
+      total_amount: Number(row.total_amount) || 0,
+      assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
+      has_external_parts: row.has_external_parts,
+      ext_shop_name: row.ext_shop_name,
+      ext_part_name: row.ext_part_name,
+      ext_cost_price: Number(row.ext_cost_price) || 0,
+      ext_selling_price: Number(row.ext_selling_price) || 0,
+      parts: [],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
 
-    localJobs.forEach(j => map.set(j.job_no, j));
-
-    data.forEach((row: any) => {
-      const existing = map.get(row.job_no);
-      map.set(row.job_no, {
-        id: row.id || existing?.id || 'job-' + Date.now(),
-        job_no: row.job_no,
-        customer_name: row.customer_name,
-        phone_number: row.phone_number,
-        machine_category: row.machine_category,
-        brand_model: row.brand_model,
-        serial_number: row.serial_number || '',
-        reported_fault: row.reported_fault,
-        status: row.status,
-        labor_charge: Number(row.labor_charge) || 0,
-        advance_deposit: Number(row.advance_deposit) || 0,
-        total_amount: Number(row.total_amount) || 0,
-        assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
-        has_external_parts: row.has_external_parts,
-        ext_shop_name: row.ext_shop_name,
-        ext_part_name: row.ext_part_name,
-        ext_cost_price: Number(row.ext_cost_price) || 0,
-        ext_selling_price: Number(row.ext_selling_price) || 0,
-        parts: existing?.parts || [],
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      });
-    });
-
-    const merged = Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     if (typeof window !== 'undefined') {
-      localStorage.setItem('fixmaster_jobs', JSON.stringify(merged));
+      localStorage.setItem('fixmaster_jobs', JSON.stringify(cloudJobs));
+      localStorage.setItem('fixmaster_sb_key', HARDCODED_SUPABASE_KEY);
+      localStorage.setItem('fixmaster_sb_url', HARDCODED_SUPABASE_URL);
     }
-    return merged;
+    return cloudJobs;
   } catch (e) {
     console.error('Failed to fetch from Supabase:', e);
     return getStoredJobs();
