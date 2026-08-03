@@ -247,7 +247,7 @@ export default function JobsPage() {
                     </p>
                   </div>
 
-                  {/* Status Dropdown */}
+                  {/* Repair Status Dropdown (Pending | In Progress | Completed) */}
                   <select
                     value={job.status}
                     onChange={(e) => handleUpdateStatus(job.id, e.target.value as JobStatus)}
@@ -263,8 +263,8 @@ export default function JobsPage() {
                   >
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Delivered">Delivered / Paid</option>
+                    <option value="Completed">Completed (Ready for POS)</option>
+                    {job.status === 'Delivered' && <option value="Delivered">Delivered / Paid</option>}
                   </select>
                 </div>
 

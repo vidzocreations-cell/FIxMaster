@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw } from 'lucide-react';
 import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud } from '@/lib/supabase';
@@ -8,6 +9,7 @@ import { JobCard, Invoice, PaymentMethod } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
 export default function POSPage() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<JobCard[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
   const [discount, setDiscount] = useState<number | ''>('');
@@ -92,14 +94,19 @@ export default function POSPage() {
       origin: { y: 0.6 },
     });
 
-    // 4. Open Thermal Receipt Print Modal
+    // 4. Open Thermal Receipt Print Modal & Auto-redirect to Sales History
     setLastInvoice(newInvoice);
     setIsReceiptOpen(true);
 
-    // Reset state & reload
+    // Reset state & redirect to Sales History (/sales)
     setSelectedJob(null);
     setDiscount('');
     loadData();
+
+    // Auto-navigate to Sales History (/sales) page
+    setTimeout(() => {
+      router.push('/sales');
+    }, 1200);
   };
 
   const profile = getStoredProfile();
