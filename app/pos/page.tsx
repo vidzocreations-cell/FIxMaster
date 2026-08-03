@@ -2,28 +2,42 @@
 
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight } from 'lucide-react';
-import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile } from '@/lib/supabase';
+import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw } from 'lucide-react';
+import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud } from '@/lib/supabase';
 import { JobCard, Invoice, PaymentMethod } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
 export default function POSPage() {
   const [jobs, setJobs] = useState<JobCard[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
-  const [discount, setDiscount] = useState<number>(0);
+  const [discount, setDiscount] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [lastInvoice, setLastInvoice] = useState<Invoice | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
-  const loadData = () => {
-    const allJobs = getStoredJobs();
-    // Billing terminal presents Completed or In Progress jobs for checkout
-    const readyForBilling = allJobs.filter((j) => j.status !== 'Delivered');
-    setJobs(readyForBilling);
+  const loadData = async () => {
+    // 1. Initial local load - ONLY Completed repair jobs are ready for billing
+    const localJobs = getStoredJobs();
+    setJobs(localJobs.filter((j) => j.status === 'Completed'));
+
+    // 2. Fetch latest live jobs from cloud
+    setIsCloudSyncing(true);
+    const cloudJobs = await fetchJobsFromSupabaseCloud();
+    setJobs(cloudJobs.filter((j) => j.status === 'Completed'));
+    setIsCloudSyncing(false);
   };
 
   useEffect(() => {
     loadData();
+
+    // 3. Realtime background sync polling every 4 seconds
+    const interval = setInterval(async () => {
+      const cloudJobs = await fetchJobsFromSupabaseCloud();
+      setJobs(cloudJobs.filter((j) => j.status === 'Completed'));
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const partsTotal = selectedJob?.parts ? selectedJob.parts.reduce((a, b) => a + b.total_price, 0) : 0;
@@ -46,7 +60,7 @@ export default function POSPage() {
       customer_name: selectedJob.customer_name,
       phone_number: selectedJob.phone_number,
       subtotal,
-      discount: Number(discount),
+      discount: Number(discount) || 0,
       net_payable: netPayable,
       payment_method: paymentMethod,
       status: 'Paid',
@@ -84,7 +98,7 @@ export default function POSPage() {
 
     // Reset state & reload
     setSelectedJob(null);
-    setDiscount(0);
+    setDiscount('');
     loadData();
   };
 
@@ -93,24 +107,40 @@ export default function POSPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Header */}
-      <div>
-        <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-          <CreditCard className="w-6 h-6 text-cyan-400" /> Point of Sale (POS) Billing Terminal
-        </h1>
-        <p className="text-xs text-slate-400">Checkout completed repair jobs, apply discounts, select payment mode & issue invoices</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <CreditCard className="w-6 h-6 text-cyan-400" /> Point of Sale (POS) Billing Terminal
+            </h1>
+            {isCloudSyncing && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" /> Syncing Cloud...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">Checkout COMPLETED repair jobs, apply discounts, select payment mode & issue receipts</p>
+        </div>
+
+        <div className="px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-800 text-xs text-emerald-300 font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>Showing ONLY &apos;Completed&apos; Repair Jobs Ready for Billing ({jobs.length})</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Job Selector Grid (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-cyan-400" /> Select Ready Job Card for Billing
+            <Wrench className="w-4 h-4 text-cyan-400" /> Select Completed Job Card for Billing
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {jobs.length === 0 ? (
-              <div className="col-span-full glass-panel p-8 rounded-2xl text-center text-slate-500 text-xs italic">
-                No ready jobs waiting for billing.
+              <div className="col-span-full glass-panel p-8 rounded-2xl text-center text-slate-500 text-xs italic space-y-1">
+                <CheckCircle2 className="w-6 h-6 text-slate-600 mx-auto" />
+                <p>No Completed repair jobs waiting for billing.</p>
+                <p className="text-[11px] text-slate-600">Mark repair jobs as &apos;Completed&apos; in Job Cards terminal to bring them here for POS checkout.</p>
               </div>
             ) : (
               jobs.map((job) => {
@@ -130,13 +160,7 @@ export default function POSPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-cyan-400 text-xs">{job.job_no}</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                          job.status === 'Completed'
-                            ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                            : 'bg-amber-950 text-amber-300 border-amber-800'
-                        }`}
-                      >
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
                         {job.status}
                       </span>
                     </div>
@@ -168,7 +192,7 @@ export default function POSPage() {
 
             {!selectedJob ? (
               <div className="p-8 text-center text-slate-500 text-xs italic">
-                Select a job card from the left panel to begin checkout.
+                Select a completed job card from the left panel to begin checkout.
               </div>
             ) : (
               <div className="space-y-4 text-xs">
@@ -208,7 +232,9 @@ export default function POSPage() {
                       type="number"
                       min="0"
                       value={discount}
-                      onChange={(e) => setDiscount(Number(e.target.value))}
+                      onChange={(e) => setDiscount(e.target.value === '' ? '' : Number(e.target.value))}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="0"
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-red-400 font-mono focus:border-red-500 focus:outline-none"
                     />
                   </div>
@@ -240,10 +266,10 @@ export default function POSPage() {
                       <span>- LKR {advanceDeposit.toLocaleString()}</span>
                     </div>
                   )}
-                  {discount > 0 && (
+                  {Number(discount) > 0 && (
                     <div className="flex justify-between text-red-400 text-[11px]">
                       <span>Discount:</span>
-                      <span>- LKR {discount.toLocaleString()}</span>
+                      <span>- LKR {Number(discount).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-extrabold text-lg text-emerald-400 pt-2 border-t border-slate-800 font-mono">
