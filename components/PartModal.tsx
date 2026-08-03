@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Package, Tag, DollarSign, Percent, AlertTriangle } from 'lucide-react';
-import { EQUIPMENT_CATEGORIES, Part, EquipmentCategory } from '@/lib/types';
+import { EQUIPMENT_CATEGORIES, Part } from '@/lib/types';
 import { getStoredParts, saveStoredParts } from '@/lib/supabase';
 
 interface PartModalProps {
@@ -154,7 +154,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
               value={partName}
               onChange={(e) => setPartName(e.target.value)}
               placeholder="e.g. Chainsaw Carburetor Gasket Kit"
-              className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -171,7 +171,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="Type or select category (e.g. Chainsaws, Generator)"
-                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-semibold"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
                 />
                 <datalist id="parts-equipment-categories-list">
                   {EQUIPMENT_CATEGORIES.map((cat) => (
@@ -189,13 +189,13 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 value={vendorName}
                 onChange={(e) => setVendorName(e.target.value)}
                 placeholder="e.g. Stihl Lanka / Singer"
-                className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Pricing Engine Box (Two-Way Bi-Directional Auto Calculation) */}
-          <div className="p-3.5 rounded-xl bg-slate-955 border border-slate-800 space-y-3">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
             <h3 className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
               <DollarSign className="w-4 h-4" /> Pricing & Margin Engine (Bi-Directional Calculation)
             </h3>
@@ -261,7 +261,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 required
                 value={stockQuantity}
                 onChange={(e) => setStockQuantity(Number(e.target.value))}
-                className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
 
@@ -275,7 +275,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   required
                   value={minStockAlert}
                   onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -286,7 +286,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-955 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </button>
