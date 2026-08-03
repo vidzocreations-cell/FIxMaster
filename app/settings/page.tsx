@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const [sbUrl, setSbUrl] = useState('');
   const [sbKey, setSbKey] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -24,34 +25,25 @@ export default function SettingsPage() {
       setSbKey(localStorage.getItem('fixmaster_sb_key') || defaultKey);
     }
 
-    // 2. Fetch live profile from Supabase Cloud
+    // 2. Fetch live profile from Supabase Cloud ONCE on mount so inputs are populated with latest cloud data
     fetchProfileFromSupabaseCloud().then((cloudProf) => {
       if (cloudProf) {
         setProfile(cloudProf);
       }
     });
-
-    // 3. Realtime background polling every 4 seconds
-    const interval = setInterval(() => {
-      fetchProfileFromSupabaseCloud().then((cloudProf) => {
-        if (cloudProf) {
-          setProfile(cloudProf);
-        }
-      });
-    }, 4000);
-
-    return () => clearInterval(interval);
   }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     await saveStoredProfile(profile);
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_sb_url', sbUrl);
       localStorage.setItem('fixmaster_sb_key', sbKey);
     }
+    setIsSaving(false);
     setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setTimeout(() => setSaveSuccess(false), 3500);
   };
 
   const handleSyncLiveUpdates = async () => {
@@ -135,8 +127,8 @@ export default function SettingsPage() {
       </div>
 
       {saveSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Business profile & receipt customization synced to Supabase Cloud!
+        <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in duration-150">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Business profile & receipt customization saved & synced to Supabase Cloud!
         </div>
       )}
 
@@ -289,9 +281,11 @@ export default function SettingsPage() {
         <div className="pt-3 border-t border-slate-800 text-right">
           <button
             type="submit"
+            disabled={isSaving}
             className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 inline-flex items-center gap-2 cursor-pointer"
           >
-            <Save className="w-4 h-4" /> Save & Sync Business Settings
+            <Save className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+            <span>{isSaving ? 'Saving to Cloud...' : 'Save & Sync Business Settings'}</span>
           </button>
         </div>
       </form>
