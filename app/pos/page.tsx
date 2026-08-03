@@ -32,7 +32,7 @@ export default function POSPage() {
   const subtotal = partsTotal + laborCharge;
   const netPayable = Math.max(0, subtotal - advanceDeposit - Number(discount));
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!selectedJob) return;
 
     // 1. Create Invoice
@@ -54,7 +54,7 @@ export default function POSPage() {
       job_card: selectedJob,
     };
 
-    saveStoredInvoices([newInvoice, ...invoices]);
+    await saveStoredInvoices([newInvoice, ...invoices]);
 
     // 2. Mark Job Card status as Delivered
     const allJobs = getStoredJobs();
@@ -69,7 +69,7 @@ export default function POSPage() {
       return j;
     });
 
-    saveStoredJobs(updatedJobs);
+    await saveStoredJobs(updatedJobs);
 
     // 3. Trigger Confetti
     confetti({

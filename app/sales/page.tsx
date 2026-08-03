@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2 } from 'lucide-react';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw } from 'lucide-react';
 import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
@@ -10,16 +10,17 @@ export default function SalesHistoryPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
   const loadInvoices = async () => {
     // 1. Initial local load for instant UI
     setInvoices(getStoredInvoices());
 
     // 2. Fetch latest live invoices from Supabase Cloud
+    setIsCloudSyncing(true);
     const cloudData = await fetchInvoicesFromSupabaseCloud();
-    if (cloudData && cloudData.length > 0) {
-      setInvoices(cloudData);
-    }
+    setInvoices(cloudData);
+    setIsCloudSyncing(false);
   };
 
   useEffect(() => {
@@ -28,9 +29,7 @@ export default function SalesHistoryPage() {
     // 3. Realtime background sync polling every 4 seconds
     const interval = setInterval(async () => {
       const cloudData = await fetchInvoicesFromSupabaseCloud();
-      if (cloudData && cloudData.length > 0) {
-        setInvoices(cloudData);
-      }
+      setInvoices(cloudData);
     }, 4000);
 
     return () => clearInterval(interval);
@@ -60,10 +59,17 @@ export default function SalesHistoryPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <History className="w-6 h-6 text-cyan-400" /> Sales History & Invoice Archive
-          </h1>
-          <p className="text-xs text-slate-400">View past sales transactions, filter by customer, reprint receipts, and delete invoices</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <History className="w-6 h-6 text-cyan-400" /> Sales History & Invoice Archive
+            </h1>
+            {isCloudSyncing && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" /> Syncing Cloud...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">View past sales transactions, filter by customer, reprint receipts, and delete invoices (Real-time Cloud Sync Active)</p>
         </div>
 
         <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-900/80 text-right">

@@ -316,11 +316,8 @@ export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
       console.error('Supabase invoices query error:', error.message);
       return getStoredInvoices();
     }
-    if (!data || data.length === 0) {
-      return getStoredInvoices();
-    }
 
-    const cloudInvoices: Invoice[] = data.map((row: any) => ({
+    const cloudInvoices: Invoice[] = (data || []).map((row: any) => ({
       id: row.id || 'inv-' + Date.now(),
       invoice_no: row.invoice_no,
       job_card_id: row.job_card_id || '',
