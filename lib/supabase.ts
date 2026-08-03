@@ -394,19 +394,28 @@ export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
       return getStoredInvoices();
     }
 
-    const cloudInvoices: Invoice[] = (data || []).map((row: any) => ({
-      id: row.id || 'inv-' + Date.now(),
-      invoice_no: row.invoice_no,
-      job_card_id: row.job_card_id || '',
-      customer_name: row.customer_name,
-      phone_number: row.phone_number,
-      subtotal: Number(row.subtotal) || 0,
-      discount: Number(row.discount) || 0,
-      net_payable: Number(row.net_payable) || 0,
-      payment_method: row.payment_method || 'Cash',
-      status: row.status || 'Paid',
-      created_at: row.created_at,
-    }));
+    const allJobs = getStoredJobs();
+
+    const cloudInvoices: Invoice[] = (data || []).map((row: any) => {
+      const matchedJob = allJobs.find(
+        (j) => (row.job_card_id && j.id === row.job_card_id) || j.customer_name === row.customer_name
+      );
+
+      return {
+        id: row.id || 'inv-' + Date.now(),
+        invoice_no: row.invoice_no,
+        job_card_id: row.job_card_id || matchedJob?.id || '',
+        customer_name: row.customer_name,
+        phone_number: row.phone_number,
+        subtotal: Number(row.subtotal) || 0,
+        discount: Number(row.discount) || 0,
+        net_payable: Number(row.net_payable) || 0,
+        payment_method: row.payment_method || 'Cash',
+        status: row.status || 'Paid',
+        created_at: row.created_at,
+        job_card: matchedJob,
+      };
+    });
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_invoices', JSON.stringify(cloudInvoices));

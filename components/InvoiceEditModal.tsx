@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2 } from 'lucide-react';
-import { Invoice, PaymentMethod, JobPart } from '@/lib/types';
-import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs } from '@/lib/supabase';
+import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag } from 'lucide-react';
+import { Invoice, PaymentMethod, JobPart, Part } from '@/lib/types';
+import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts } from '@/lib/supabase';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -19,6 +19,8 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [partsList, setPartsList] = useState<JobPart[]>([]);
+  const [catalogParts, setCatalogParts] = useState<Part[]>([]);
+  const [selectedCatalogPartId, setSelectedCatalogPartId] = useState('');
   const [laborCharge, setLaborCharge] = useState<number | ''>(0);
   const [subtotal, setSubtotal] = useState<number | ''>('');
   const [discount, setDiscount] = useState<number | ''>('');
@@ -34,8 +36,16 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
       setPhoneNumber(invoiceToEdit.phone_number);
       setPaymentMethod(invoiceToEdit.payment_method || 'Cash');
 
-      // Load parts from invoice or associated job card
-      const targetJob = invoiceToEdit.job_card;
+      // Load all catalog parts for quick dropdown selection
+      const availableCatalog = getStoredParts();
+      setCatalogParts(availableCatalog);
+
+      // Load matching job card to extract parts
+      const allJobs = getStoredJobs();
+      const targetJob =
+        allJobs.find((j) => (invoiceToEdit.job_card_id && j.id === invoiceToEdit.job_card_id) || j.customer_name === invoiceToEdit.customer_name) ||
+        invoiceToEdit.job_card;
+
       let initialParts: JobPart[] = targetJob?.parts || [];
 
       if (initialParts.length === 0 && targetJob?.ext_part_name) {
@@ -65,8 +75,9 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
 
       const partsTotal = initialParts.reduce((a, b) => a + b.total_price, 0);
       const computedSub = partsTotal + lCharge;
-      setSubtotal(invoiceToEdit.subtotal || computedSub);
-      setNetPayable(invoiceToEdit.net_payable || Math.max(0, computedSub - Number(discVal)));
+      const finalSub = invoiceToEdit.subtotal || computedSub;
+      setSubtotal(finalSub);
+      setNetPayable(invoiceToEdit.net_payable || Math.max(0, finalSub - Number(discVal)));
     }
   }, [invoiceToEdit, isOpen]);
 
@@ -124,17 +135,38 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
 
   const handleAddNewPartRow = () => {
     const newPartItem: JobPart = {
-      id: 'jp-custom-' + Date.now(),
+      id: 'jp-custom-' + Date.now() + Math.random(),
       job_card_id: invoiceToEdit.job_card_id || '',
       part_id: 'custom-' + Date.now(),
-      part_name: 'New Part Item',
+      part_name: 'Spare Part Item',
       quantity: 1,
-      unit_price: 500,
-      total_price: 500,
+      unit_price: 1000,
+      total_price: 1000,
       cost_price: 0,
       margin_percent: 0,
     };
     updateFinancials([...partsList, newPartItem], laborCharge, discount);
+  };
+
+  const handleAddCatalogPartSelect = (partId: string) => {
+    if (!partId) return;
+    const selected = catalogParts.find((p) => p.id === partId);
+    if (!selected) return;
+
+    const newPartItem: JobPart = {
+      id: 'jp-cat-' + Date.now() + Math.random(),
+      job_card_id: invoiceToEdit.job_card_id || '',
+      part_id: selected.id,
+      part_name: selected.part_name,
+      quantity: 1,
+      unit_price: selected.retail_price,
+      total_price: selected.retail_price,
+      cost_price: selected.cost_price,
+      margin_percent: selected.margin_percent,
+    };
+
+    updateFinancials([...partsList, newPartItem], laborCharge, discount);
+    setSelectedCatalogPartId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -146,9 +178,14 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
     const netNum = Number(netPayable) || Math.max(0, subNum - discNum);
     const laborNum = Number(laborCharge) || 0;
 
-    const updatedJobCard = invoiceToEdit.job_card
+    const allJobs = getStoredJobs();
+    const targetJob =
+      allJobs.find((j) => (invoiceToEdit.job_card_id && j.id === invoiceToEdit.job_card_id) || j.customer_name === invoiceToEdit.customer_name) ||
+      invoiceToEdit.job_card;
+
+    const updatedJobCard = targetJob
       ? {
-          ...invoiceToEdit.job_card,
+          ...targetJob,
           customer_name: customerName,
           phone_number: phoneNumber,
           labor_charge: laborNum,
@@ -176,10 +213,9 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
     await saveStoredInvoices(updatedInvoices);
 
     // Also update associated job card if found
-    if (invoiceToEdit.job_card_id) {
-      const jobs = getStoredJobs();
-      const updatedJobs = jobs.map((j) => {
-        if (j.id === invoiceToEdit.job_card_id || j.customer_name === invoiceToEdit.customer_name) {
+    if (targetJob) {
+      const updatedJobs = allJobs.map((j) => {
+        if (j.id === targetJob.id || j.customer_name === invoiceToEdit.customer_name) {
           return {
             ...j,
             customer_name: customerName,
@@ -267,23 +303,43 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
 
           {/* Itemized Parts & Prices Table */}
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 className="font-bold text-cyan-400 flex items-center gap-1.5">
                 <Package className="w-4 h-4" /> Itemized Spare Parts & Retail Prices (කොටස්වල මිල වෙනස් කරන්න)
               </h3>
-              <button
-                type="button"
-                onClick={handleAddNewPartRow}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3 h-3" /> Add Item
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Catalog Quick Add Select */}
+                {catalogParts.length > 0 && (
+                  <select
+                    value={selectedCatalogPartId}
+                    onChange={(e) => handleAddCatalogPartSelect(e.target.value)}
+                    className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 text-[11px] focus:border-cyan-500 focus:outline-none cursor-pointer max-w-[170px]"
+                  >
+                    <option value="">+ From Catalog Stock</option>
+                    {catalogParts.map((catP) => (
+                      <option key={catP.id} value={catP.id}>
+                        {catP.part_name} (LKR {catP.retail_price})
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleAddNewPartRow}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" /> Add Custom Item
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               {partsList.length === 0 ? (
-                <div className="p-4 text-center text-slate-500 text-[11px] italic">
-                  No spare parts items on this invoice. Click &apos;+ Add Item&apos; to add parts.
+                <div className="p-4 text-center text-slate-500 text-[11px] italic space-y-1">
+                  <p>No spare parts items attached yet.</p>
+                  <p className="text-cyan-400 font-semibold">Click &apos;+ Add Custom Item&apos; or pick &apos;+ From Catalog Stock&apos; to add parts to this receipt.</p>
                 </div>
               ) : (
                 partsList.map((p, idx) => (
@@ -382,7 +438,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
                   value={discount}
                   onChange={(e) => updateFinancials(partsList, laborCharge, e.target.value === '' ? '' : Number(e.target.value))}
                   onFocus={(e) => e.target.select()}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-red-400 font-mono focus:border-red-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-red-800 rounded-lg px-2.5 py-1.5 text-xs text-red-400 font-mono focus:border-red-500 focus:outline-none"
                 />
               </div>
 
