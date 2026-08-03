@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Settings, ShieldCheck, Database, Download, Upload, RotateCcw, Save, Building, Link2, CheckCircle2, RefreshCw, Sparkles, Smartphone, Receipt, FileText } from 'lucide-react';
-import { getStoredProfile, saveStoredProfile, getStoredJobs, saveStoredJobs, getStoredParts, saveStoredParts, getStoredInvoices, saveStoredInvoices } from '@/lib/supabase';
+import { getStoredProfile, saveStoredProfile, fetchProfileFromSupabaseCloud, getStoredJobs, saveStoredJobs, getStoredParts, saveStoredParts, getStoredInvoices, saveStoredInvoices } from '@/lib/supabase';
 import { BusinessProfile } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -13,19 +13,39 @@ export default function SettingsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
+    // 1. Initial local load
     const prof = getStoredProfile();
     setProfile(prof);
+
     if (typeof window !== 'undefined') {
       const defaultUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://emvbsjturokhyjpeoiiv.supabase.co';
       const defaultKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
       setSbUrl(localStorage.getItem('fixmaster_sb_url') || defaultUrl);
       setSbKey(localStorage.getItem('fixmaster_sb_key') || defaultKey);
     }
+
+    // 2. Fetch live profile from Supabase Cloud
+    fetchProfileFromSupabaseCloud().then((cloudProf) => {
+      if (cloudProf) {
+        setProfile(cloudProf);
+      }
+    });
+
+    // 3. Realtime background polling every 4 seconds
+    const interval = setInterval(() => {
+      fetchProfileFromSupabaseCloud().then((cloudProf) => {
+        if (cloudProf) {
+          setProfile(cloudProf);
+        }
+      });
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoredProfile(profile);
+    await saveStoredProfile(profile);
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_sb_url', sbUrl);
       localStorage.setItem('fixmaster_sb_key', sbKey);
@@ -116,7 +136,7 @@ export default function SettingsPage() {
 
       {saveSuccess && (
         <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Business profile & receipt customization saved successfully!
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Business profile & receipt customization synced to Supabase Cloud!
         </div>
       )}
 
@@ -153,8 +173,8 @@ export default function SettingsPage() {
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Receipt className="w-5 h-5 text-cyan-400" /> Business Profile & Receipt Customization Table
           </h2>
-          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-semibold">
-            Custom Receipts Engine
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" /> Realtime Cloud Sync
           </span>
         </div>
 
@@ -271,7 +291,7 @@ export default function SettingsPage() {
             type="submit"
             className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 inline-flex items-center gap-2 cursor-pointer"
           >
-            <Save className="w-4 h-4" /> Save Business & Receipt Settings
+            <Save className="w-4 h-4" /> Save & Sync Business Settings
           </button>
         </div>
       </form>

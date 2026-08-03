@@ -345,8 +345,66 @@ export function getStoredProfile(): BusinessProfile {
   }
 }
 
-export function saveStoredProfile(profile: BusinessProfile) {
+export async function saveStoredProfile(profile: BusinessProfile) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_profile', JSON.stringify(profile));
+  }
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('profiles').upsert({
+        id: 'default-profile',
+        shop_name: profile.shop_name,
+        address: profile.address,
+        phone: profile.phone,
+        email: profile.email,
+        currency: profile.currency,
+        invoice_prefix: profile.invoice_prefix,
+        job_prefix: profile.job_prefix,
+        default_margin: profile.default_margin,
+        receipt_footer_note: profile.receipt_footer_note,
+        receipt_terms: profile.receipt_terms,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    } catch (e) {
+      console.error('Failed to upsert profile to Supabase:', e);
+    }
+  }
+}
+
+export async function fetchProfileFromSupabaseCloud(): Promise<BusinessProfile> {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { data, error } = await supabase.from('profiles').select('*').limit(1);
+    if (error) {
+      console.error('Supabase profile query error:', error.message);
+      return getStoredProfile();
+    }
+    if (!data || data.length === 0) {
+      return getStoredProfile();
+    }
+
+    const row = data[0];
+    const cloudProfile: BusinessProfile = {
+      shop_name: row.shop_name || INITIAL_BUSINESS_PROFILE.shop_name,
+      address: row.address || INITIAL_BUSINESS_PROFILE.address,
+      phone: row.phone || INITIAL_BUSINESS_PROFILE.phone,
+      email: row.email || INITIAL_BUSINESS_PROFILE.email,
+      currency: row.currency || INITIAL_BUSINESS_PROFILE.currency,
+      invoice_prefix: row.invoice_prefix || INITIAL_BUSINESS_PROFILE.invoice_prefix,
+      job_prefix: row.job_prefix || INITIAL_BUSINESS_PROFILE.job_prefix,
+      default_margin: Number(row.default_margin) || 30,
+      receipt_footer_note: row.receipt_footer_note || INITIAL_BUSINESS_PROFILE.receipt_footer_note,
+      receipt_terms: row.receipt_terms || INITIAL_BUSINESS_PROFILE.receipt_terms,
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fixmaster_profile', JSON.stringify(cloudProfile));
+    }
+    return cloudProfile;
+  } catch (e) {
+    console.error('Failed to fetch profile from Supabase:', e);
+    return getStoredProfile();
   }
 }
