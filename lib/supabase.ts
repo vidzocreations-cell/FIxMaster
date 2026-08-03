@@ -294,6 +294,19 @@ export async function saveStoredInvoices(invoices: Invoice[]) {
   }
 }
 
+export async function deleteStoredInvoice(invoiceId: string, invoiceNo: string) {
+  const invoices = getStoredInvoices();
+  const updated = invoices.filter(i => i.id !== invoiceId && i.invoice_no !== invoiceNo);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_invoices', JSON.stringify(updated));
+  }
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    await supabase.from('invoices').delete().eq('invoice_no', invoiceNo);
+  }
+}
+
 export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
   const supabase = getSupabaseClient();
 

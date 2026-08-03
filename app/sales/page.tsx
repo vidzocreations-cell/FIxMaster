@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight } from 'lucide-react';
-import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, getStoredProfile } from '@/lib/supabase';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2 } from 'lucide-react';
+import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
@@ -11,28 +11,37 @@ export default function SalesHistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
-  useEffect(() => {
+  const loadInvoices = async () => {
     // 1. Initial local load for instant UI
     setInvoices(getStoredInvoices());
 
     // 2. Fetch latest live invoices from Supabase Cloud
-    fetchInvoicesFromSupabaseCloud().then((cloudData) => {
+    const cloudData = await fetchInvoicesFromSupabaseCloud();
+    if (cloudData && cloudData.length > 0) {
+      setInvoices(cloudData);
+    }
+  };
+
+  useEffect(() => {
+    loadInvoices();
+
+    // 3. Realtime background sync polling every 4 seconds
+    const interval = setInterval(async () => {
+      const cloudData = await fetchInvoicesFromSupabaseCloud();
       if (cloudData && cloudData.length > 0) {
         setInvoices(cloudData);
       }
-    });
-
-    // 3. Realtime background sync polling every 4 seconds
-    const interval = setInterval(() => {
-      fetchInvoicesFromSupabaseCloud().then((cloudData) => {
-        if (cloudData && cloudData.length > 0) {
-          setInvoices(cloudData);
-        }
-      });
     }, 4000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleDeleteInvoice = async (invoiceId: string, invoiceNo: string) => {
+    if (confirm(`Are you sure you want to delete Invoice ${invoiceNo}? This action cannot be undone.`)) {
+      await deleteStoredInvoice(invoiceId, invoiceNo);
+      setInvoices((prev) => prev.filter((i) => i.id !== invoiceId && i.invoice_no !== invoiceNo));
+    }
+  };
 
   const filteredInvoices = invoices.filter((inv) => {
     const q = searchQuery.toLowerCase();
@@ -54,7 +63,7 @@ export default function SalesHistoryPage() {
           <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
             <History className="w-6 h-6 text-cyan-400" /> Sales History & Invoice Archive
           </h1>
-          <p className="text-xs text-slate-400">View past sales transactions, filter by customer, and reprint sales invoices</p>
+          <p className="text-xs text-slate-400">View past sales transactions, filter by customer, reprint receipts, and delete invoices</p>
         </div>
 
         <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-900/80 text-right">
@@ -90,7 +99,7 @@ export default function SalesHistoryPage() {
                 <th className="p-3.5">Subtotal</th>
                 <th className="p-3.5">Discount</th>
                 <th className="p-3.5">Net Paid</th>
-                <th className="p-3.5 text-right">Receipt</th>
+                <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -122,12 +131,21 @@ export default function SalesHistoryPage() {
                       LKR {inv.net_payable.toLocaleString()}
                     </td>
                     <td className="p-3.5 text-right">
-                      <button
-                        onClick={() => setSelectedInvoice(inv)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-cyan-400" /> Reprint
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedInvoice(inv)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-cyan-400" /> Reprint
+                        </button>
+                        <button
+                          onClick={() => handleDeleteInvoice(inv.id, inv.invoice_no)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
+                          title="Delete Invoice"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
