@@ -1,5 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-import { JobCard, Part, Invoice, BusinessProfile, JobPart } from './types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { JobCard, Part, Invoice, BusinessProfile } from './types';
+
+const HARDCODED_SUPABASE_URL = 'https://emvbsjturokhyjpeoiiv.supabase.co';
+const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
 
 const INITIAL_BUSINESS_PROFILE: BusinessProfile = {
   shop_name: 'FixMaster Repair & Hardware POS',
@@ -111,13 +114,25 @@ const INITIAL_JOBS: JobCard[] = [
   },
 ];
 
+let cachedClient: SupabaseClient | null = null;
+
 // Supabase client instance helper
 export function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '') || 'https://emvbsjturokhyjpeoiiv.supabase.co';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_key') : '') || 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
-  
+  if (cachedClient) return cachedClient;
+
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  let key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || url.includes('your-supabase-project')) {
+    url = (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '') || HARDCODED_SUPABASE_URL;
+  }
+  if (!key || key.includes('your-supabase-anon-key')) {
+    key = (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_key') : '') || HARDCODED_SUPABASE_KEY;
+  }
+
   if (url && key) {
-    return createClient(url, key);
+    cachedClient = createClient(url, key);
+    return cachedClient;
   }
   return null;
 }
@@ -172,46 +187,50 @@ export function getStoredJobs(): JobCard[] {
   }
 }
 
-export function saveStoredJobs(jobs: JobCard[]) {
+export async function saveStoredJobs(jobs: JobCard[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(jobs));
   }
   const supabase = getSupabaseClient();
   if (supabase) {
     for (const j of jobs) {
-      supabase.from('job_cards').upsert({
-        job_no: j.job_no,
-        customer_name: j.customer_name,
-        phone_number: j.phone_number,
-        machine_category: j.machine_category,
-        brand_model: j.brand_model,
-        serial_number: j.serial_number,
-        reported_fault: j.reported_fault,
-        status: j.status,
-        labor_charge: j.labor_charge,
-        advance_deposit: j.advance_deposit,
-        total_amount: j.total_amount,
-        assigned_technician_name: j.assigned_technician_name,
-        has_external_parts: j.has_external_parts,
-        ext_shop_name: j.ext_shop_name,
-        ext_part_name: j.ext_part_name,
-        ext_cost_price: j.ext_cost_price,
-        ext_selling_price: j.ext_selling_price,
-        created_at: j.created_at,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'job_no' }).then();
+      try {
+        await supabase.from('job_cards').upsert({
+          job_no: j.job_no,
+          customer_name: j.customer_name,
+          phone_number: j.phone_number,
+          machine_category: j.machine_category,
+          brand_model: j.brand_model,
+          serial_number: j.serial_number,
+          reported_fault: j.reported_fault,
+          status: j.status,
+          labor_charge: j.labor_charge,
+          advance_deposit: j.advance_deposit,
+          total_amount: j.total_amount,
+          assigned_technician_name: j.assigned_technician_name,
+          has_external_parts: j.has_external_parts,
+          ext_shop_name: j.ext_shop_name,
+          ext_part_name: j.ext_part_name,
+          ext_cost_price: j.ext_cost_price,
+          ext_selling_price: j.ext_selling_price,
+          created_at: j.created_at,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'job_no' });
+      } catch (e) {
+        console.error('Failed to upsert job card to Supabase:', e);
+      }
     }
   }
 }
 
-export function deleteStoredJob(jobId: string, jobNo: string) {
+export async function deleteStoredJob(jobId: string, jobNo: string) {
   const jobs = getStoredJobs();
   const updated = jobs.filter(j => j.id !== jobId && j.job_no !== jobNo);
   saveStoredJobs(updated);
 
   const supabase = getSupabaseClient();
   if (supabase) {
-    supabase.from('job_cards').delete().eq('job_no', jobNo).then();
+    await supabase.from('job_cards').delete().eq('job_no', jobNo);
   }
 }
 
@@ -221,17 +240,19 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
 
   try {
     const { data, error } = await supabase.from('job_cards').select('*').order('created_at', { ascending: false });
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.error('Supabase query error:', error.message);
+      return getStoredJobs();
+    }
+    if (!data || data.length === 0) {
       return getStoredJobs();
     }
 
     const localJobs = getStoredJobs();
     const map = new Map<string, JobCard>();
 
-    // Put local jobs in map
     localJobs.forEach(j => map.set(j.job_no, j));
 
-    // Override or add Supabase cloud jobs
     data.forEach((row: any) => {
       const existing = map.get(row.job_no);
       map.set(row.job_no, {
