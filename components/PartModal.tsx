@@ -16,7 +16,7 @@ interface PartModalProps {
 export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: PartModalProps) {
   const [mounted, setMounted] = useState(false);
   const [partName, setPartName] = useState('');
-  const [category, setCategory] = useState<EquipmentCategory>('Chainsaws');
+  const [category, setCategory] = useState<string>('Chainsaws');
   const [vendorName, setVendorName] = useState('');
   const [costPrice, setCostPrice] = useState<number | ''>(500);
   const [marginPercent, setMarginPercent] = useState<number | ''>(30);
@@ -31,7 +31,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
   useEffect(() => {
     if (partToEdit) {
       setPartName(partToEdit.part_name);
-      setCategory(partToEdit.category as EquipmentCategory);
+      setCategory(partToEdit.category);
       setVendorName(partToEdit.vendor_name || '');
       setCostPrice(partToEdit.cost_price);
       setMarginPercent(partToEdit.margin_percent);
@@ -159,22 +159,25 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Category */}
+            {/* Typeable Category */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category *</label>
               <div className="relative">
                 <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <select
+                <input
+                  type="text"
+                  required
+                  list="parts-equipment-categories-list"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as EquipmentCategory)}
-                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
-                >
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Type or select category (e.g. Chainsaws, Generator)"
+                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-semibold"
+                />
+                <datalist id="parts-equipment-categories-list">
                   {EQUIPMENT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
+                    <option key={cat} value={cat} />
                   ))}
-                </select>
+                </datalist>
               </div>
             </div>
 

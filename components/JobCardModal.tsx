@@ -17,7 +17,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [mounted, setMounted] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [machineCategory, setMachineCategory] = useState<EquipmentCategory>('Chainsaws');
+  const [machineCategory, setMachineCategory] = useState<string>('Chainsaws');
   const [brandModel, setBrandModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [reportedFault, setReportedFault] = useState('');
@@ -40,7 +40,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     if (jobToEdit) {
       setCustomerName(jobToEdit.customer_name);
       setPhoneNumber(jobToEdit.phone_number);
-      setMachineCategory(jobToEdit.machine_category as EquipmentCategory);
+      setMachineCategory(jobToEdit.machine_category);
       setBrandModel(jobToEdit.brand_model);
       setSerialNumber(jobToEdit.serial_number || '');
       setReportedFault(jobToEdit.reported_fault);
@@ -246,22 +246,25 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Equipment Category */}
+            {/* Typeable / Searchable Equipment Category */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category / Mode *</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category / Type *</label>
               <div className="relative">
                 <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <select
+                <input
+                  type="text"
+                  required
+                  list="job-equipment-categories-list"
                   value={machineCategory}
-                  onChange={(e) => setMachineCategory(e.target.value as EquipmentCategory)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
-                >
+                  onChange={(e) => setMachineCategory(e.target.value)}
+                  placeholder="Type or select category (e.g. Chainsaws, Generator)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
+                />
+                <datalist id="job-equipment-categories-list">
                   {EQUIPMENT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
+                    <option key={cat} value={cat} />
                   ))}
-                </select>
+                </datalist>
               </div>
             </div>
 
