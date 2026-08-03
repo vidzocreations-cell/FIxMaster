@@ -158,11 +158,53 @@ export function getStoredJobs(): JobCard[] {
   }
 }
 
+// Auto-creates an Invoice when a job status is updated to 'Delivered' / Paid
+export async function ensureInvoiceForDeliveredJob(job: JobCard) {
+  if (job.status !== 'Delivered') return;
+  const existingInvoices = getStoredInvoices();
+  const alreadyHasInvoice = existingInvoices.some(
+    (inv) => inv.job_card_id === job.id || (job.job_no && inv.invoice_no.endsWith(job.job_no.replace('JOB-', '')))
+  );
+
+  if (!alreadyHasInvoice) {
+    const partsTotal = job.parts ? job.parts.reduce((a, b) => a + b.total_price, 0) : 0;
+    const subtotal = partsTotal + (job.labor_charge || 0);
+    const advanceDeposit = job.advance_deposit || 0;
+    const netPayable = Math.max(0, subtotal - advanceDeposit);
+    const nextInvNo = `INV-${1001 + existingInvoices.length}`;
+
+    const newInvoice: Invoice = {
+      id: 'inv-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      invoice_no: nextInvNo,
+      job_card_id: job.id,
+      customer_name: job.customer_name,
+      phone_number: job.phone_number,
+      subtotal,
+      discount: 0,
+      net_payable: netPayable,
+      payment_method: 'Cash',
+      status: 'Paid',
+      created_at: new Date().toISOString(),
+      job_card: job,
+    };
+
+    await saveStoredInvoices([newInvoice, ...existingInvoices]);
+  }
+}
+
 export async function saveStoredJobs(jobs: JobCard[]) {
   const cleanJobs = jobs.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(cleanJobs));
   }
+
+  // Ensure invoice exists for any Delivered / Paid job
+  for (const j of cleanJobs) {
+    if (j.status === 'Delivered') {
+      await ensureInvoiceForDeliveredJob(j);
+    }
+  }
+
   const supabase = getSupabaseClient();
   if (supabase) {
     for (const j of cleanJobs) {
