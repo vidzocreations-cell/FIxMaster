@@ -121,4 +121,6 @@ export interface BusinessProfile {
   default_margin: number;
   supabase_url?: string;
   supabase_anon_key?: string;
+  receipt_footer_note?: string;
+  receipt_terms?: string;
 }

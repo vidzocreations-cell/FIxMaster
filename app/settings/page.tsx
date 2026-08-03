@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldCheck, Database, Download, Upload, RotateCcw, Save, Building, Link2, CheckCircle2, RefreshCw, Sparkles, Smartphone } from 'lucide-react';
+import { Settings, ShieldCheck, Database, Download, Upload, RotateCcw, Save, Building, Link2, CheckCircle2, RefreshCw, Sparkles, Smartphone, Receipt, FileText } from 'lucide-react';
 import { getStoredProfile, saveStoredProfile, getStoredJobs, saveStoredJobs, getStoredParts, saveStoredParts, getStoredInvoices, saveStoredInvoices } from '@/lib/supabase';
 import { BusinessProfile } from '@/lib/types';
 
@@ -111,16 +111,16 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
           <Settings className="w-6 h-6 text-cyan-400" /> Settings & Live System Sync
         </h1>
-        <p className="text-xs text-slate-400">Configure business information, Supabase database keys, live app updates & data backup controls</p>
+        <p className="text-xs text-slate-400">Configure business information, receipt customization, Supabase database keys & data backups</p>
       </div>
 
       {saveSuccess && (
         <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Settings & Supabase credentials saved successfully!
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Business profile & receipt customization saved successfully!
         </div>
       )}
 
-      {/* 0. In-App Instant Live Updater (APK Re-install නොකර Instant Update ගැනීම) */}
+      {/* 0. In-App Instant Live Updater */}
       <div className="glass-panel p-6 rounded-2xl border border-cyan-800/60 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/40 space-y-4 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
@@ -147,7 +147,136 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 1. Supabase Cloud Configuration */}
+      {/* 1. Business Profile & Receipt Information Customization Form */}
+      <form onSubmit={handleSaveProfile} className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-cyan-400" /> Business Profile & Receipt Customization Table
+          </h2>
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-semibold">
+            Custom Receipts Engine
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-400">
+          පහත සදහන් තොරතුරු වෙනස් කර Save කළ විට, **Print වන සියලුම Invoices & Receipts වල මෙම තොරතුරු ඍජුවම සජීවීව වෙනස් වනු ඇත.**
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Shop / Business Name (ආයතනයේ නම) *</label>
+            <input
+              type="text"
+              required
+              value={profile.shop_name}
+              onChange={(e) => setProfile({ ...profile, shop_name: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Contact Phone Numbers (දුරකථන අංක) *</label>
+            <input
+              type="text"
+              required
+              value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-slate-300 font-semibold mb-1">Shop Address (ලිපිනය) *</label>
+            <input
+              type="text"
+              required
+              value={profile.address}
+              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Business Email (ඊමේල්)</label>
+            <input
+              type="email"
+              value={profile.email}
+              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Currency Symbol (මුදල් ඒකකය)</label>
+            <input
+              type="text"
+              value={profile.currency}
+              onChange={(e) => setProfile({ ...profile, currency: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Invoice Number Prefix</label>
+            <input
+              type="text"
+              value={profile.invoice_prefix}
+              onChange={(e) => setProfile({ ...profile, invoice_prefix: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Repair Job Number Prefix</label>
+            <input
+              type="text"
+              value={profile.job_prefix}
+              onChange={(e) => setProfile({ ...profile, job_prefix: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none font-mono"
+            />
+          </div>
+
+          {/* Receipt Custom Messages */}
+          <div className="md:col-span-2 space-y-3 pt-2 border-t border-slate-800">
+            <h3 className="font-bold text-cyan-400 flex items-center gap-1.5">
+              <FileText className="w-4 h-4" /> Custom Receipt Messages & Terms (Receipt එකේ යටින් මුද්‍රණය වන පාඨ)
+            </h3>
+
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Receipt Thank You Footer Message</label>
+              <input
+                type="text"
+                value={profile.receipt_footer_note || ''}
+                onChange={(e) => setProfile({ ...profile, receipt_footer_note: e.target.value })}
+                placeholder="e.g. *** THANK YOU FOR YOUR BUSINESS ***"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Receipt Warranty & Conditions Note</label>
+              <textarea
+                rows={2}
+                value={profile.receipt_terms || ''}
+                onChange={(e) => setProfile({ ...profile, receipt_terms: e.target.value })}
+                placeholder="e.g. 30-day warranty applies to replaced parts with this original receipt."
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-slate-800 text-right">
+          <button
+            type="submit"
+            className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 inline-flex items-center gap-2 cursor-pointer"
+          >
+            <Save className="w-4 h-4" /> Save Business & Receipt Settings
+          </button>
+        </div>
+      </form>
+
+      {/* 2. Supabase Cloud Configuration */}
       <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
@@ -186,77 +315,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-
-      {/* 2. Business Profile Details */}
-      <form onSubmit={handleSaveProfile} className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-          <Building className="w-4 h-4 text-cyan-400" /> Business Profile & Receipt Information
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Shop / Business Name *</label>
-            <input
-              type="text"
-              required
-              value={profile.shop_name}
-              onChange={(e) => setProfile({ ...profile, shop_name: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Contact Phone Numbers *</label>
-            <input
-              type="text"
-              required
-              value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-slate-300 font-semibold mb-1">Shop Address *</label>
-            <input
-              type="text"
-              required
-              value={profile.address}
-              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Currency Code</label>
-            <input
-              type="text"
-              value={profile.currency}
-              onChange={(e) => setProfile({ ...profile, currency: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Default Profit Margin (%)</label>
-            <input
-              type="number"
-              value={profile.default_margin}
-              onChange={(e) => setProfile({ ...profile, default_margin: Number(e.target.value) })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="pt-2 border-t border-slate-800 text-right">
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 inline-flex items-center gap-2 cursor-pointer"
-          >
-            <Save className="w-4 h-4" /> Save Business Profile
-          </button>
-        </div>
-      </form>
 
       {/* 3. Data Backup & Maintenance Controls */}
       <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">

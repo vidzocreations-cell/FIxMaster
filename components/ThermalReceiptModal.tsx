@@ -129,26 +129,26 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
           <div className="border-t-2 border-dashed border-black pt-2 space-y-1 text-right text-[11px]">
             <div className="flex justify-between">
               <span>Gross Subtotal:</span>
-              <span className="font-bold">LKR {subtotal.toLocaleString()}</span>
+              <span className="font-bold">{profile.currency || 'LKR'} {subtotal.toLocaleString()}</span>
             </div>
 
             {deposit > 0 && (
               <div className="flex justify-between font-bold">
                 <span>Advance Deposit Paid:</span>
-                <span>- LKR {deposit.toLocaleString()}</span>
+                <span>- {profile.currency || 'LKR'} {deposit.toLocaleString()}</span>
               </div>
             )}
 
             {discount > 0 && (
               <div className="flex justify-between font-bold">
                 <span>Discount Allowed:</span>
-                <span>- LKR {discount.toLocaleString()}</span>
+                <span>- {profile.currency || 'LKR'} {discount.toLocaleString()}</span>
               </div>
             )}
 
             <div className="flex justify-between font-extrabold text-sm sm:text-base border-t-2 border-black pt-1 mt-1 text-black">
               <span>NET PAYABLE:</span>
-              <span>LKR {netPayable.toLocaleString()}</span>
+              <span>{profile.currency || 'LKR'} {netPayable.toLocaleString()}</span>
             </div>
 
             {invoice && (
@@ -161,8 +161,8 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
 
           {/* Terms & Barcode Visual */}
           <div className="text-center text-[10px] border-t border-dashed border-black pt-3 space-y-2">
-            <p className="font-bold">*** THANK YOU FOR YOUR BUSINESS ***</p>
-            <p className="text-[9px] text-gray-700">30-day warranty applies to replaced parts with this original receipt.</p>
+            <p className="font-bold">{profile.receipt_footer_note || '*** THANK YOU FOR YOUR BUSINESS ***'}</p>
+            <p className="text-[9px] text-gray-700">{profile.receipt_terms || '30-day warranty applies to replaced parts with this original receipt.'}</p>
             
             {/* Barcode Visual */}
             <div className="pt-1 flex flex-col items-center justify-center">

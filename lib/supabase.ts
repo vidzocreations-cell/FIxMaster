@@ -13,6 +13,8 @@ const INITIAL_BUSINESS_PROFILE: BusinessProfile = {
   invoice_prefix: 'INV-',
   job_prefix: 'JOB-',
   default_margin: 30,
+  receipt_footer_note: '*** THANK YOU FOR YOUR BUSINESS ***',
+  receipt_terms: '30-day warranty applies to replaced parts with this original receipt.',
 };
 
 export const INITIAL_TECHNICIANS: Technician[] = [
@@ -333,7 +335,11 @@ export function getStoredProfile(): BusinessProfile {
     return INITIAL_BUSINESS_PROFILE;
   }
   try {
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return {
+      ...INITIAL_BUSINESS_PROFILE,
+      ...parsed,
+    };
   } catch {
     return INITIAL_BUSINESS_PROFILE;
   }
