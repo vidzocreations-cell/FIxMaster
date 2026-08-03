@@ -33,7 +33,7 @@ export default function TechniciansPage() {
   const handleOpenAddModal = () => {
     setEditingTech(null);
     setName('');
-    setSpecialization('General Power Tools Tech');
+    setSpecialization('Senior Motor & Engine Specialist');
     setPhone('');
     setStatus('Active');
     setIsModalOpen(true);
@@ -94,8 +94,8 @@ export default function TechniciansPage() {
   };
 
   const modalContent = isModalOpen ? (
-    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-3 sm:p-6 flex items-center justify-center min-h-screen">
-      <div className="w-full max-w-md bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4 shadow-2xl relative my-auto">
+    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-3 sm:p-6 flex items-start sm:items-center justify-center min-h-screen">
+      <div className="w-full max-w-md bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4 shadow-2xl relative my-auto min-h-screen sm:min-h-0 overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-cyan-400" />
@@ -112,16 +112,17 @@ export default function TechniciansPage() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs pb-8 sm:pb-0">
           <div>
             <label className="block font-semibold text-slate-300 mb-1">Technician Full Name *</label>
             <input
               type="text"
               required
+              autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Ruwan Dissayake"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-slate-950 text-white font-medium border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs placeholder-slate-500 focus:bg-slate-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 focus:outline-none"
             />
           </div>
 
@@ -133,7 +134,7 @@ export default function TechniciansPage() {
               value={specialization}
               onChange={(e) => setSpecialization(e.target.value)}
               placeholder="e.g. Chainsaw & Motor Specialist / Power Tools"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-slate-950 text-white font-medium border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs placeholder-slate-500 focus:bg-slate-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 focus:outline-none"
             />
           </div>
 
@@ -145,7 +146,7 @@ export default function TechniciansPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. 0771234567"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-slate-950 text-white font-medium border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs placeholder-slate-500 focus:bg-slate-900 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 focus:outline-none"
             />
           </div>
 
@@ -154,7 +155,7 @@ export default function TechniciansPage() {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              className="w-full bg-slate-950 text-white font-medium border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:bg-slate-900 focus:border-cyan-400 focus:outline-none cursor-pointer"
             >
               <option value="Active">Active (Available for Job Assignment)</option>
               <option value="Inactive">Inactive / On Leave</option>
@@ -165,13 +166,13 @@ export default function TechniciansPage() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+              className="px-5 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
             >
               {editingTech ? 'Save Changes' : 'Add Technician'}
             </button>
