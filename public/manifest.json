@@ -1,10 +1,11 @@
 {
   "short_name": "FixMaster",
   "name": "FixMaster POS & Repair Management System",
-  "id": "/",
+  "id": "fixmaster-pwa-app",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
   "background_color": "#090d16",
   "theme_color": "#06b6d4",
   "orientation": "any",
