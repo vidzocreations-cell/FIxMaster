@@ -262,25 +262,66 @@ export function getStoredInvoices(): Invoice[] {
   }
 }
 
-export function saveStoredInvoices(invoices: Invoice[]) {
+export async function saveStoredInvoices(invoices: Invoice[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_invoices', JSON.stringify(invoices));
   }
   const supabase = getSupabaseClient();
   if (supabase) {
     for (const inv of invoices) {
-      supabase.from('invoices').upsert({
-        invoice_no: inv.invoice_no,
-        customer_name: inv.customer_name,
-        phone_number: inv.phone_number,
-        subtotal: inv.subtotal,
-        discount: inv.discount,
-        net_payable: inv.net_payable,
-        payment_method: inv.payment_method,
-        status: inv.status,
-        created_at: inv.created_at,
-      }, { onConflict: 'invoice_no' }).then();
+      try {
+        await supabase.from('invoices').upsert({
+          invoice_no: inv.invoice_no,
+          customer_name: inv.customer_name,
+          phone_number: inv.phone_number,
+          subtotal: inv.subtotal,
+          discount: inv.discount,
+          net_payable: inv.net_payable,
+          payment_method: inv.payment_method,
+          status: inv.status,
+          created_at: inv.created_at,
+        }, { onConflict: 'invoice_no' });
+      } catch (e) {
+        console.error('Failed to upsert invoice to Supabase:', e);
+      }
     }
+  }
+}
+
+export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { data, error } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Supabase invoices query error:', error.message);
+      return getStoredInvoices();
+    }
+    if (!data || data.length === 0) {
+      return getStoredInvoices();
+    }
+
+    const cloudInvoices: Invoice[] = data.map((row: any) => ({
+      id: row.id || 'inv-' + Date.now(),
+      invoice_no: row.invoice_no,
+      job_card_id: row.job_card_id || '',
+      customer_name: row.customer_name,
+      phone_number: row.phone_number,
+      subtotal: Number(row.subtotal) || 0,
+      discount: Number(row.discount) || 0,
+      net_payable: Number(row.net_payable) || 0,
+      payment_method: row.payment_method || 'Cash',
+      status: row.status || 'Paid',
+      created_at: row.created_at,
+    }));
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fixmaster_invoices', JSON.stringify(cloudInvoices));
+    }
+    return cloudInvoices;
+  } catch (e) {
+    console.error('Failed to fetch invoices from Supabase:', e);
+    return getStoredInvoices();
   }
 }
 

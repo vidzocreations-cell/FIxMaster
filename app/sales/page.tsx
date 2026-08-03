@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight } from 'lucide-react';
-import { getStoredInvoices, getStoredProfile } from '@/lib/supabase';
+import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, getStoredProfile } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
@@ -12,7 +12,26 @@ export default function SalesHistoryPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
+    // 1. Initial local load for instant UI
     setInvoices(getStoredInvoices());
+
+    // 2. Fetch latest live invoices from Supabase Cloud
+    fetchInvoicesFromSupabaseCloud().then((cloudData) => {
+      if (cloudData && cloudData.length > 0) {
+        setInvoices(cloudData);
+      }
+    });
+
+    // 3. Realtime background sync polling every 4 seconds
+    const interval = setInterval(() => {
+      fetchInvoicesFromSupabaseCloud().then((cloudData) => {
+        if (cloudData && cloudData.length > 0) {
+          setInvoices(cloudData);
+        }
+      });
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const filteredInvoices = invoices.filter((inv) => {
