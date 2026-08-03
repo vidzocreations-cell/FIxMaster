@@ -65,6 +65,16 @@ export default function JobDetailPage() {
     );
   }
 
+  // Delete Job Card
+  const handleDeleteJobCard = () => {
+    if (confirm(`Are you sure you want to delete Job Card ${job.job_no}? This action cannot be undone.`)) {
+      const jobs = getStoredJobs();
+      const updated = jobs.filter((j) => j.id !== job.id);
+      saveStoredJobs(updated);
+      router.push('/jobs');
+    }
+  };
+
   // 1. Add Part from Internal Shop Stock
   const handleAddStockPart = () => {
     if (!selectedPartId) return;
@@ -267,7 +277,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Back Link */}
+      {/* Back Link & Action Bar */}
       <div className="flex items-center justify-between">
         <Link
           href="/jobs"
@@ -276,13 +286,21 @@ export default function JobDetailPage() {
           <ArrowLeft className="w-4 h-4" /> Back to All Job Cards
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <WhatsAppButton job={job} />
           <button
             onClick={() => setIsReceiptOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4 text-cyan-400" /> Print Ticket / Receipt
+          </button>
+          
+          <button
+            onClick={handleDeleteJobCard}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-300 bg-red-950/60 hover:bg-red-900/80 border border-red-900 transition-all cursor-pointer"
+            title="Delete Job Card"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" /> Delete Job
           </button>
         </div>
       </div>

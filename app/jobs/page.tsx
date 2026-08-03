@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle, Trash2 } from 'lucide-react';
 import { getStoredJobs, saveStoredJobs } from '@/lib/supabase';
 import { JobCard, JobStatus } from '@/lib/types';
 import JobCardFilterBar, { DatePreset } from '@/components/JobCardFilterBar';
@@ -44,6 +44,14 @@ export default function JobsPage() {
     });
     saveStoredJobs(updated);
     setJobs(updated);
+  };
+
+  const handleDeleteJob = (jobId: string, jobNo: string) => {
+    if (confirm(`Are you sure you want to delete Job Card ${jobNo}? This action cannot be undone.`)) {
+      const updated = jobs.filter((j) => j.id !== jobId);
+      saveStoredJobs(updated);
+      setJobs(updated);
+    }
   };
 
   const handleResetFilters = () => {
@@ -274,7 +282,7 @@ export default function JobsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <WhatsAppButton job={job} />
                     <button
                       onClick={() => setQrJob(job)}
@@ -282,6 +290,15 @@ export default function JobsPage() {
                       title="Print Job Ticket QR"
                     >
                       <QrCode className="w-4 h-4" />
+                    </button>
+
+                    {/* Delete Job Button */}
+                    <button
+                      onClick={() => handleDeleteJob(job.id, job.job_no)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-900 border border-slate-800 transition-all cursor-pointer"
+                      title="Delete Job Card"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-400/80" />
                     </button>
                   </div>
                 </div>
