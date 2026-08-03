@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw } from 'lucide-react';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3 } from 'lucide-react';
 import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
+import InvoiceEditModal from '@/components/InvoiceEditModal';
 
 export default function SalesHistoryPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
   const loadInvoices = async () => {
@@ -69,7 +71,7 @@ export default function SalesHistoryPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">View past sales transactions, filter by customer, reprint receipts, and delete invoices (Real-time Cloud Sync Active)</p>
+          <p className="text-xs text-slate-400">View past sales transactions, edit receipt details, reprint receipts & delete invoices (Real-time Cloud Sync Active)</p>
         </div>
 
         <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-900/80 text-right">
@@ -138,6 +140,14 @@ export default function SalesHistoryPage() {
                     </td>
                     <td className="p-3.5 text-right">
                       <div className="inline-flex items-center gap-1.5">
+                        {/* Edit Receipt Button */}
+                        <button
+                          onClick={() => setEditingInvoice(inv)}
+                          className="p-1.5 rounded-lg text-cyan-400 hover:text-cyan-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
+                          title="Edit Receipt Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => setSelectedInvoice(inv)}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
@@ -166,6 +176,13 @@ export default function SalesHistoryPage() {
         onClose={() => setSelectedInvoice(null)}
         invoice={selectedInvoice}
         profile={profile}
+      />
+
+      <InvoiceEditModal
+        isOpen={!!editingInvoice}
+        onClose={() => setEditingInvoice(null)}
+        invoiceToEdit={editingInvoice}
+        onSaved={loadInvoices}
       />
     </div>
   );
