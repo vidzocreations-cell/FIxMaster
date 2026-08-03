@@ -151,19 +151,21 @@ export function getStoredJobs(): JobCard[] {
     return INITIAL_JOBS;
   }
   try {
-    return JSON.parse(data);
+    const parsed: JobCard[] = JSON.parse(data);
+    return parsed.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
   } catch {
     return INITIAL_JOBS;
   }
 }
 
 export async function saveStoredJobs(jobs: JobCard[]) {
+  const cleanJobs = jobs.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
   if (typeof window !== 'undefined') {
-    localStorage.setItem('fixmaster_jobs', JSON.stringify(jobs));
+    localStorage.setItem('fixmaster_jobs', JSON.stringify(cleanJobs));
   }
   const supabase = getSupabaseClient();
   if (supabase) {
-    for (const j of jobs) {
+    for (const j of cleanJobs) {
       try {
         await supabase.from('job_cards').upsert({
           job_no: j.job_no,
@@ -219,29 +221,31 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
       return getStoredJobs();
     }
 
-    const cloudJobs: JobCard[] = data.map((row: any) => ({
-      id: row.id,
-      job_no: row.job_no,
-      customer_name: row.customer_name,
-      phone_number: row.phone_number,
-      machine_category: row.machine_category,
-      brand_model: row.brand_model,
-      serial_number: row.serial_number || '',
-      reported_fault: row.reported_fault,
-      status: row.status,
-      labor_charge: Number(row.labor_charge) || 0,
-      advance_deposit: Number(row.advance_deposit) || 0,
-      total_amount: Number(row.total_amount) || 0,
-      assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
-      has_external_parts: row.has_external_parts,
-      ext_shop_name: row.ext_shop_name,
-      ext_part_name: row.ext_part_name,
-      ext_cost_price: Number(row.ext_cost_price) || 0,
-      ext_selling_price: Number(row.ext_selling_price) || 0,
-      parts: [],
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    const cloudJobs: JobCard[] = data
+      .filter((row: any) => row.job_no !== 'SYS-CONFIG-PROFILE')
+      .map((row: any) => ({
+        id: row.id,
+        job_no: row.job_no,
+        customer_name: row.customer_name,
+        phone_number: row.phone_number,
+        machine_category: row.machine_category,
+        brand_model: row.brand_model,
+        serial_number: row.serial_number || '',
+        reported_fault: row.reported_fault,
+        status: row.status,
+        labor_charge: Number(row.labor_charge) || 0,
+        advance_deposit: Number(row.advance_deposit) || 0,
+        total_amount: Number(row.total_amount) || 0,
+        assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
+        has_external_parts: row.has_external_parts,
+        ext_shop_name: row.ext_shop_name,
+        ext_part_name: row.ext_part_name,
+        ext_cost_price: Number(row.ext_cost_price) || 0,
+        ext_selling_price: Number(row.ext_selling_price) || 0,
+        parts: [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_jobs', JSON.stringify(cloudJobs));
@@ -352,22 +356,27 @@ export async function saveStoredProfile(profile: BusinessProfile) {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('profiles').upsert({
-        id: 'default-profile',
-        shop_name: profile.shop_name,
-        address: profile.address,
-        phone: profile.phone,
-        email: profile.email,
-        currency: profile.currency,
-        invoice_prefix: profile.invoice_prefix,
-        job_prefix: profile.job_prefix,
-        default_margin: profile.default_margin,
-        receipt_footer_note: profile.receipt_footer_note,
-        receipt_terms: profile.receipt_terms,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+      await supabase.from('job_cards').upsert({
+        job_no: 'SYS-CONFIG-PROFILE',
+        customer_name: profile.shop_name,
+        phone_number: profile.phone,
+        machine_category: profile.currency,
+        brand_model: profile.address,
+        reported_fault: profile.email,
+        status: 'Completed',
+        labor_charge: profile.default_margin,
+        advance_deposit: 0,
+        total_amount: 0,
+        ext_shop_name: profile.invoice_prefix,
+        ext_part_name: profile.job_prefix,
+        external_parts_note: JSON.stringify({
+          receipt_footer_note: profile.receipt_footer_note || '*** THANK YOU FOR YOUR BUSINESS ***',
+          receipt_terms: profile.receipt_terms || '30-day warranty applies to replaced parts with this original receipt.'
+        }),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'job_no' });
     } catch (e) {
-      console.error('Failed to upsert profile to Supabase:', e);
+      console.error('Failed to upsert business profile to Supabase:', e);
     }
   }
 }
@@ -376,27 +385,34 @@ export async function fetchProfileFromSupabaseCloud(): Promise<BusinessProfile> 
   const supabase = getSupabaseClient();
 
   try {
-    const { data, error } = await supabase.from('profiles').select('*').limit(1);
-    if (error) {
-      console.error('Supabase profile query error:', error.message);
-      return getStoredProfile();
-    }
-    if (!data || data.length === 0) {
+    const { data, error } = await supabase
+      .from('job_cards')
+      .select('*')
+      .eq('job_no', 'SYS-CONFIG-PROFILE');
+
+    if (error || !data || data.length === 0) {
       return getStoredProfile();
     }
 
     const row = data[0];
+    let extraNotes: any = {};
+    if (row.external_parts_note) {
+      try {
+        extraNotes = JSON.parse(row.external_parts_note);
+      } catch (e) {}
+    }
+
     const cloudProfile: BusinessProfile = {
-      shop_name: row.shop_name || INITIAL_BUSINESS_PROFILE.shop_name,
-      address: row.address || INITIAL_BUSINESS_PROFILE.address,
-      phone: row.phone || INITIAL_BUSINESS_PROFILE.phone,
-      email: row.email || INITIAL_BUSINESS_PROFILE.email,
-      currency: row.currency || INITIAL_BUSINESS_PROFILE.currency,
-      invoice_prefix: row.invoice_prefix || INITIAL_BUSINESS_PROFILE.invoice_prefix,
-      job_prefix: row.job_prefix || INITIAL_BUSINESS_PROFILE.job_prefix,
-      default_margin: Number(row.default_margin) || 30,
-      receipt_footer_note: row.receipt_footer_note || INITIAL_BUSINESS_PROFILE.receipt_footer_note,
-      receipt_terms: row.receipt_terms || INITIAL_BUSINESS_PROFILE.receipt_terms,
+      shop_name: row.customer_name || INITIAL_BUSINESS_PROFILE.shop_name,
+      address: row.brand_model || INITIAL_BUSINESS_PROFILE.address,
+      phone: row.phone_number || INITIAL_BUSINESS_PROFILE.phone,
+      email: row.reported_fault || INITIAL_BUSINESS_PROFILE.email,
+      currency: row.machine_category || INITIAL_BUSINESS_PROFILE.currency,
+      invoice_prefix: row.ext_shop_name || INITIAL_BUSINESS_PROFILE.invoice_prefix,
+      job_prefix: row.ext_part_name || INITIAL_BUSINESS_PROFILE.job_prefix,
+      default_margin: Number(row.labor_charge) || 30,
+      receipt_footer_note: extraNotes.receipt_footer_note || INITIAL_BUSINESS_PROFILE.receipt_footer_note,
+      receipt_terms: extraNotes.receipt_terms || INITIAL_BUSINESS_PROFILE.receipt_terms,
     };
 
     if (typeof window !== 'undefined') {
