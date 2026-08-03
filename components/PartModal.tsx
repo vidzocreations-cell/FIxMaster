@@ -52,8 +52,6 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
 
   if (!isOpen || !mounted) return null;
 
-  // Bi-directional pricing engine:
-
   const handleCostPriceChange = (costVal: number) => {
     setCostPrice(costVal);
     const currMargin = Number(marginPercent) || 0;
@@ -128,9 +126,9 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-3 sm:p-6 flex items-start justify-center min-h-screen">
-      <div className="w-full max-w-lg bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative my-auto max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-30">
+    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-0 sm:p-6 flex items-start justify-center min-h-screen">
+      <div className="w-full max-w-lg bg-slate-900 sm:rounded-2xl border-0 sm:border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative min-h-screen sm:min-h-0 sm:my-auto sm:max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40 pt-2 sm:pt-0">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-cyan-400" />
             <h2 className="text-base sm:text-lg font-bold text-white">
@@ -140,13 +138,13 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pb-12 sm:pb-0">
           {/* Part Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Part Name *</label>
@@ -281,7 +279,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-30">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
             <button
               type="button"
               onClick={onClose}
