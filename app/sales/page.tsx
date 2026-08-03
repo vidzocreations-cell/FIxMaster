@@ -1,15 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3 } from 'lucide-react';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter } from 'lucide-react';
 import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 import InvoiceEditModal from '@/components/InvoiceEditModal';
 
+export type SalesDatePreset = 'all' | 'today' | 'week' | 'month' | 'custom';
+
 export default function SalesHistoryPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [datePreset, setDatePreset] = useState<SalesDatePreset>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
@@ -44,16 +50,52 @@ export default function SalesHistoryPage() {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setDatePreset('all');
+    setStartDate('');
+    setEndDate('');
+  };
+
   const filteredInvoices = invoices.filter((inv) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      inv.invoice_no.toLowerCase().includes(q) ||
-      inv.customer_name.toLowerCase().includes(q) ||
-      inv.phone_number.toLowerCase().includes(q)
-    );
+    // 1. Search Query Filter
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const matches =
+        inv.invoice_no.toLowerCase().includes(q) ||
+        inv.customer_name.toLowerCase().includes(q) ||
+        inv.phone_number.toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+
+    // 2. Date Presets Filter
+    if (datePreset !== 'all') {
+      const invDate = new Date(inv.created_at);
+      const now = new Date();
+
+      if (datePreset === 'today') {
+        const todayStr = now.toISOString().split('T')[0];
+        if (!inv.created_at.startsWith(todayStr)) return false;
+      } else if (datePreset === 'week') {
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (invDate < oneWeekAgo) return false;
+      } else if (datePreset === 'month') {
+        if (invDate.getMonth() !== now.getMonth() || invDate.getFullYear() !== now.getFullYear()) {
+          return false;
+        }
+      } else if (datePreset === 'custom' && startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (invDate < start || invDate > end) return false;
+      }
+    }
+
+    return true;
   });
 
   const totalSalesRevenue = invoices.reduce((acc, inv) => acc + inv.net_payable, 0);
+  const filteredSalesRevenue = filteredInvoices.reduce((acc, inv) => acc + inv.net_payable, 0);
   const profile = getStoredProfile();
 
   return (
@@ -71,27 +113,91 @@ export default function SalesHistoryPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">View past sales transactions, edit receipt details, reprint receipts & delete invoices (Real-time Cloud Sync Active)</p>
+          <p className="text-xs text-slate-400">View past sales transactions, filter by date range, edit receipt details & reprint receipts (Real-time Cloud Sync Active)</p>
         </div>
 
-        <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-900/80 text-right">
-          <span className="text-[11px] text-slate-400">Total Lifetime Sales Revenue:</span>
-          <div className="text-xl font-mono font-extrabold text-emerald-400">
-            LKR {totalSalesRevenue.toLocaleString()}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-right">
+            <span className="text-[11px] text-slate-400 block">Filtered Revenue ({filteredInvoices.length} Bills):</span>
+            <span className="text-base font-mono font-extrabold text-cyan-400">
+              LKR {filteredSalesRevenue.toLocaleString()}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-900/80 text-right">
+            <span className="text-[11px] text-slate-400 block">Total Lifetime Revenue:</span>
+            <div className="text-lg font-mono font-extrabold text-emerald-400">
+              LKR {totalSalesRevenue.toLocaleString()}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-800 relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-7 top-7" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by Invoice #, Customer Name, or Phone..."
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-        />
+      {/* Date Filter & Search Controls Bar */}
+      <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* Search Bar */}
+          <div className="md:col-span-5 relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Invoice #, Customer Name, or Phone..."
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+
+          {/* Date Range Presets Dropdown */}
+          <div className="md:col-span-4 relative">
+            <Calendar className="w-4 h-4 text-cyan-400 absolute left-3 top-3 z-10" />
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value as SalesDatePreset)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer font-semibold"
+            >
+              <option value="all">📅 All Dates Sales (සියලුම දින)</option>
+              <option value="today">☀️ Today Sales (අද දින)</option>
+              <option value="week">📆 This Week Sales (මෙම සතියේ)</option>
+              <option value="month">📅 This Month Sales (මෙම මාසයේ)</option>
+              <option value="custom">🔍 Custom Date Range (නියමිත දින)</option>
+            </select>
+          </div>
+
+          {/* Reset Filters Button */}
+          <div className="md:col-span-3 flex items-center justify-end">
+            <button
+              onClick={handleResetFilters}
+              className="w-full md:w-auto px-3.5 py-2 rounded-xl text-xs text-slate-400 bg-slate-900 border border-slate-800 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Custom Date Pickers */}
+        {datePreset === 'custom' && (
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800 text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Start Date:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">End Date:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Invoices Table */}
@@ -114,7 +220,7 @@ export default function SalesHistoryPage() {
               {filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-500 italic">
-                    No sales invoices found in history archive.
+                    No sales invoices found matching your date or search filters.
                   </td>
                 </tr>
               ) : (
