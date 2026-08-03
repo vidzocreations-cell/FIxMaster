@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
+import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle, Trash2, RefreshCw, Edit3 } from 'lucide-react';
 import { getStoredJobs, saveStoredJobs, deleteStoredJob, fetchJobsFromSupabaseCloud } from '@/lib/supabase';
 import { JobCard, JobStatus } from '@/lib/types';
 import JobCardFilterBar, { DatePreset } from '@/components/JobCardFilterBar';
@@ -295,7 +295,7 @@ export default function JobsPage() {
                   )}
                 </div>
 
-                {/* Financial Summary */}
+                {/* Financial Summary & Actions */}
                 <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
                   <div>
                     <span className="text-slate-400 text-[11px]">Parts ({job.parts?.length || 0}) + Labor:</span>
@@ -305,7 +305,20 @@ export default function JobsPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Edit Job Button */}
+                    <button
+                      onClick={() => {
+                        setEditingJob(job);
+                        setIsModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg text-cyan-400 hover:text-cyan-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
+                      title="Edit Job Card Details"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
                     <WhatsAppButton job={job} />
+                    
                     <button
                       onClick={() => setQrJob(job)}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 bg-slate-900 border border-slate-800 transition-all cursor-pointer"

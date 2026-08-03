@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Wrench, Package, Plus, Trash2, Printer, Save, CheckCircle2, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent } from 'lucide-react';
+import { ArrowLeft, Wrench, Package, Plus, Trash2, Printer, Save, CheckCircle2, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent, Edit3 } from 'lucide-react';
 import { getStoredJobs, saveStoredJobs, getStoredParts, saveStoredParts, getStoredProfile } from '@/lib/supabase';
 import { JobCard, Part, JobPart } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
+import JobCardModal from '@/components/JobCardModal';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
 export default function JobDetailPage() {
@@ -16,7 +17,8 @@ export default function JobDetailPage() {
 
   const [job, setJob] = useState<JobCard | null>(null);
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
-  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   // Tab state for adding parts: 'stock' | 'external'
   const [addPartMode, setAddPartMode] = useState<'stock' | 'external'>('stock');
 
@@ -278,7 +280,7 @@ export default function JobDetailPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Back Link & Action Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <Link
           href="/jobs"
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-all font-semibold"
@@ -286,15 +288,24 @@ export default function JobDetailPage() {
           <ArrowLeft className="w-4 h-4" /> Back to All Job Cards
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Edit Job Details Button */}
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 transition-all cursor-pointer shadow-md shadow-cyan-950"
+          >
+            <Edit3 className="w-4 h-4 text-cyan-400" /> Edit Job Details
+          </button>
+
           <WhatsAppButton job={job} />
+          
           <button
             onClick={() => setIsReceiptOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4 text-cyan-400" /> Print Ticket / Receipt
           </button>
-          
+
           <button
             onClick={handleDeleteJobCard}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-300 bg-red-950/60 hover:bg-red-900/80 border border-red-900 transition-all cursor-pointer"
@@ -338,7 +349,7 @@ export default function JobDetailPage() {
 
         {/* Customer & Machine Details Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1 relative">
             <p className="text-slate-400 font-semibold flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-cyan-400" /> Customer Information
             </p>
@@ -638,6 +649,13 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      <JobCardModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        jobToEdit={job}
+        onSaved={loadJobData}
+      />
 
       <ThermalReceiptModal
         isOpen={isReceiptOpen}
