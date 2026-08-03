@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle, Trash2 } from 'lucide-react';
-import { getStoredJobs, saveStoredJobs } from '@/lib/supabase';
+import { Wrench, Plus, QrCode, ArrowUpRight, MessageSquare, Clock, User, Phone, Tag, CheckCircle2, ExternalLink, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
+import { getStoredJobs, saveStoredJobs, deleteStoredJob, fetchJobsFromSupabaseCloud } from '@/lib/supabase';
 import { JobCard, JobStatus } from '@/lib/types';
 import JobCardFilterBar, { DatePreset } from '@/components/JobCardFilterBar';
 import JobCardModal from '@/components/JobCardModal';
@@ -18,17 +18,33 @@ export default function JobsPage() {
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<JobCard | null>(null);
   const [qrJob, setQrJob] = useState<JobCard | null>(null);
 
-  const loadJobs = () => {
+  const loadJobs = async () => {
+    // 1. Instant local load
     setJobs(getStoredJobs());
+
+    // 2. Asynchronous Cloud Sync from Supabase
+    setIsCloudSyncing(true);
+    const cloudJobs = await fetchJobsFromSupabaseCloud();
+    setJobs(cloudJobs);
+    setIsCloudSyncing(false);
   };
 
   useEffect(() => {
     loadJobs();
+
+    // 4-second Realtime Cloud Polling for instant multi-device sync
+    const interval = setInterval(async () => {
+      const cloudJobs = await fetchJobsFromSupabaseCloud();
+      setJobs(cloudJobs);
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdateStatus = (jobId: string, newStatus: JobStatus) => {
@@ -48,9 +64,8 @@ export default function JobsPage() {
 
   const handleDeleteJob = (jobId: string, jobNo: string) => {
     if (confirm(`Are you sure you want to delete Job Card ${jobNo}? This action cannot be undone.`)) {
-      const updated = jobs.filter((j) => j.id !== jobId);
-      saveStoredJobs(updated);
-      setJobs(updated);
+      deleteStoredJob(jobId, jobNo);
+      setJobs((prev) => prev.filter((j) => j.id !== jobId && j.job_no !== jobNo));
     }
   };
 
@@ -137,10 +152,17 @@ export default function JobsPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <Wrench className="w-6 h-6 text-cyan-400" /> Repair Job Cards Terminal
-          </h1>
-          <p className="text-xs text-slate-400">Track equipment repairs, assign spare parts, update statuses & notify customers</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <Wrench className="w-6 h-6 text-cyan-400" /> Repair Job Cards Terminal
+            </h1>
+            {isCloudSyncing && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" /> Syncing Cloud...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">Track equipment repairs, assign spare parts, update statuses & notify customers (Real-time Cloud Sync Active)</p>
         </div>
 
         <button

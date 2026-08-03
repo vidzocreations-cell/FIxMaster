@@ -61,42 +61,6 @@ const INITIAL_PARTS: Part[] = [
     min_stock_alert: 10,
     created_at: new Date().toISOString(),
   },
-  {
-    id: 'part-5',
-    part_name: 'Rice Cooker Heating Element 1.8L',
-    category: 'Rice Cookers',
-    vendor_name: 'Singer Spares',
-    cost_price: 1800,
-    margin_percent: 35,
-    retail_price: 2430,
-    stock_quantity: 6,
-    min_stock_alert: 2,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'part-6',
-    part_name: 'Blender Motor Coupling Gear',
-    category: 'Blenders',
-    vendor_name: 'National Panasonic Center',
-    cost_price: 250,
-    margin_percent: 80,
-    retail_price: 450,
-    stock_quantity: 30,
-    min_stock_alert: 8,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'part-7',
-    part_name: 'Drill Machine Chuck Key 13mm',
-    category: 'Drilling Machines',
-    vendor_name: 'Makita Lanka',
-    cost_price: 500,
-    margin_percent: 40,
-    retail_price: 700,
-    stock_quantity: 15,
-    min_stock_alert: 5,
-    created_at: new Date().toISOString(),
-  },
 ];
 
 const INITIAL_JOBS: JobCard[] = [
@@ -145,40 +109,12 @@ const INITIAL_JOBS: JobCard[] = [
     parts: [],
     created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
-  {
-    id: 'job-3',
-    job_no: 'JOB-1003',
-    customer_name: 'Sunil Jayasinghe',
-    phone_number: '0755554433',
-    machine_category: 'Cutting Machines / Angle Grinders',
-    brand_model: 'Makita GA4030',
-    serial_number: 'MK-12009',
-    reported_fault: 'Sparks coming from motor commutator',
-    status: 'Completed',
-    labor_charge: 1000,
-    advance_deposit: 0,
-    total_amount: 1560,
-    assigned_technician_name: 'Saman Kumara',
-    parts: [
-      {
-        id: 'jp-2',
-        job_card_id: 'job-3',
-        part_id: 'part-4',
-        part_name: 'Angle Grinder Carbon Brush Set',
-        quantity: 1,
-        unit_price: 560,
-        total_price: 560,
-        warranty_days: 30,
-      },
-    ],
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
 ];
 
 // Supabase client instance helper
 export function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '');
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_key') : '');
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_url') : '') || 'https://emvbsjturokhyjpeoiiv.supabase.co';
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (typeof window !== 'undefined' ? localStorage.getItem('fixmaster_sb_key') : '') || 'sb_publishable_TAPl-Lyp0TejP6u60giaxA_sk76E7d9';
   
   if (url && key) {
     return createClient(url, key);
@@ -205,6 +141,21 @@ export function saveStoredParts(parts: Part[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_parts', JSON.stringify(parts));
   }
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    for (const p of parts) {
+      supabase.from('parts').upsert({
+        part_name: p.part_name,
+        category: p.category,
+        vendor_name: p.vendor_name,
+        cost_price: p.cost_price,
+        margin_percent: p.margin_percent,
+        retail_price: p.retail_price,
+        stock_quantity: p.stock_quantity,
+        min_stock_alert: p.min_stock_alert,
+      }).then();
+    }
+  }
 }
 
 export function getStoredJobs(): JobCard[] {
@@ -225,6 +176,98 @@ export function saveStoredJobs(jobs: JobCard[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(jobs));
   }
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    for (const j of jobs) {
+      supabase.from('job_cards').upsert({
+        job_no: j.job_no,
+        customer_name: j.customer_name,
+        phone_number: j.phone_number,
+        machine_category: j.machine_category,
+        brand_model: j.brand_model,
+        serial_number: j.serial_number,
+        reported_fault: j.reported_fault,
+        status: j.status,
+        labor_charge: j.labor_charge,
+        advance_deposit: j.advance_deposit,
+        total_amount: j.total_amount,
+        assigned_technician_name: j.assigned_technician_name,
+        has_external_parts: j.has_external_parts,
+        ext_shop_name: j.ext_shop_name,
+        ext_part_name: j.ext_part_name,
+        ext_cost_price: j.ext_cost_price,
+        ext_selling_price: j.ext_selling_price,
+        created_at: j.created_at,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'job_no' }).then();
+    }
+  }
+}
+
+export function deleteStoredJob(jobId: string, jobNo: string) {
+  const jobs = getStoredJobs();
+  const updated = jobs.filter(j => j.id !== jobId && j.job_no !== jobNo);
+  saveStoredJobs(updated);
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    supabase.from('job_cards').delete().eq('job_no', jobNo).then();
+  }
+}
+
+export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return getStoredJobs();
+
+  try {
+    const { data, error } = await supabase.from('job_cards').select('*').order('created_at', { ascending: false });
+    if (error || !data || data.length === 0) {
+      return getStoredJobs();
+    }
+
+    const localJobs = getStoredJobs();
+    const map = new Map<string, JobCard>();
+
+    // Put local jobs in map
+    localJobs.forEach(j => map.set(j.job_no, j));
+
+    // Override or add Supabase cloud jobs
+    data.forEach((row: any) => {
+      const existing = map.get(row.job_no);
+      map.set(row.job_no, {
+        id: row.id || existing?.id || 'job-' + Date.now(),
+        job_no: row.job_no,
+        customer_name: row.customer_name,
+        phone_number: row.phone_number,
+        machine_category: row.machine_category,
+        brand_model: row.brand_model,
+        serial_number: row.serial_number || '',
+        reported_fault: row.reported_fault,
+        status: row.status,
+        labor_charge: Number(row.labor_charge) || 0,
+        advance_deposit: Number(row.advance_deposit) || 0,
+        total_amount: Number(row.total_amount) || 0,
+        assigned_technician_name: row.assigned_technician_name || 'Saman Kumara',
+        has_external_parts: row.has_external_parts,
+        ext_shop_name: row.ext_shop_name,
+        ext_part_name: row.ext_part_name,
+        ext_cost_price: Number(row.ext_cost_price) || 0,
+        ext_selling_price: Number(row.ext_selling_price) || 0,
+        parts: existing?.parts || [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      });
+    });
+
+    const merged = Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fixmaster_jobs', JSON.stringify(merged));
+    }
+    return merged;
+  } catch (e) {
+    console.error('Failed to fetch from Supabase:', e);
+    return getStoredJobs();
+  }
 }
 
 export function getStoredInvoices(): Invoice[] {
@@ -241,6 +284,22 @@ export function getStoredInvoices(): Invoice[] {
 export function saveStoredInvoices(invoices: Invoice[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_invoices', JSON.stringify(invoices));
+  }
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    for (const inv of invoices) {
+      supabase.from('invoices').upsert({
+        invoice_no: inv.invoice_no,
+        customer_name: inv.customer_name,
+        phone_number: inv.phone_number,
+        subtotal: inv.subtotal,
+        discount: inv.discount,
+        net_payable: inv.net_payable,
+        payment_method: inv.payment_method,
+        status: inv.status,
+        created_at: inv.created_at,
+      }, { onConflict: 'invoice_no' }).then();
+    }
   }
 }
 
