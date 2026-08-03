@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store } from 'lucide-react';
+import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician } from '@/lib/types';
 import { getStoredJobs, saveStoredJobs, getStoredTechnicians } from '@/lib/supabase';
 
@@ -31,6 +31,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [extShopName, setExtShopName] = useState('');
   const [extPartName, setExtPartName] = useState('');
   const [extCostPrice, setExtCostPrice] = useState<number | ''>('');
+  const [extMarginPercent, setExtMarginPercent] = useState<number | ''>(30);
   const [extSellingPrice, setExtSellingPrice] = useState<number | ''>('');
 
   useEffect(() => {
@@ -59,8 +60,19 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setHasExternalParts(!!jobToEdit.has_external_parts);
       setExtShopName(jobToEdit.ext_shop_name || '');
       setExtPartName(jobToEdit.ext_part_name || '');
-      setExtCostPrice(jobToEdit.ext_cost_price ? jobToEdit.ext_cost_price : '');
-      setExtSellingPrice(jobToEdit.ext_selling_price ? jobToEdit.ext_selling_price : '');
+
+      const cPrice = jobToEdit.ext_cost_price ? jobToEdit.ext_cost_price : '';
+      const sPrice = jobToEdit.ext_selling_price ? jobToEdit.ext_selling_price : '';
+      setExtCostPrice(cPrice);
+      setExtSellingPrice(sPrice);
+
+      const cNum = Number(cPrice) || 0;
+      const sNum = Number(sPrice) || 0;
+      if (cNum > 0 && sNum > 0) {
+        setExtMarginPercent(Number((((sNum - cNum) / cNum) * 100).toFixed(2)));
+      } else {
+        setExtMarginPercent(30);
+      }
     } else {
       setCustomerName('');
       setPhoneNumber('');
@@ -75,17 +87,40 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setExtShopName('');
       setExtPartName('');
       setExtCostPrice('');
+      setExtMarginPercent(30);
       setExtSellingPrice('');
     }
   }, [jobToEdit, isOpen]);
 
   if (!isOpen || !mounted) return null;
 
-  const handleCostPriceChange = (val: number | '') => {
+  const handleExtCostChange = (val: number | '') => {
     setExtCostPrice(val);
-    const num = Number(val) || 0;
-    if (num > 0 && (extSellingPrice === '' || extSellingPrice === 0)) {
-      setExtSellingPrice(Math.round(num + num * 0.3));
+    const cost = Number(val) || 0;
+    const margin = Number(extMarginPercent) || 0;
+    if (cost > 0 && margin >= 0) {
+      const retail = Number((cost + (cost * margin) / 100).toFixed(2));
+      setExtSellingPrice(retail);
+    }
+  };
+
+  const handleExtMarginChange = (val: number | '') => {
+    setExtMarginPercent(val);
+    const margin = Number(val) || 0;
+    const cost = Number(extCostPrice) || 0;
+    if (cost > 0) {
+      const retail = Number((cost + (cost * margin) / 100).toFixed(2));
+      setExtSellingPrice(retail);
+    }
+  };
+
+  const handleExtSellingPriceChange = (val: number | '') => {
+    setExtSellingPrice(val);
+    const retail = Number(val) || 0;
+    const cost = Number(extCostPrice) || 0;
+    if (cost > 0 && retail >= 0) {
+      const margin = Number((((retail - cost) / cost) * 100).toFixed(2));
+      setExtMarginPercent(margin);
     }
   };
 
@@ -95,7 +130,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
     const costNum = Number(extCostPrice) || 0;
     const sellingNum = Number(extSellingPrice) || 0;
-    const computedMargin = costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0;
+    const computedMargin = Number(extMarginPercent) || (costNum > 0 ? Math.round(((sellingNum - costNum) / costNum) * 100) : 0);
     const laborNum = Number(laborCharge) || 0;
     const depositNum = Number(advanceDeposit) || 0;
 
@@ -387,32 +422,58 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Outside Purchase Cost Price (LKR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={extCostPrice}
-                      onChange={(e) => handleCostPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
-                      onFocus={(e) => e.target.select()}
-                      placeholder="e.g. 2500"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
-                    />
-                  </div>
+                {/* 3-Way Bi-Directional Pricing Box for Outside Shop Parts */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="text-[11px] font-bold text-amber-400 block">
+                    💰 Outside Shop Bi-Directional Pricing Engine (කඩෙන් ගත් ගණන, ලාභ %, පාරිභෝගික විකුණුම් මිල)
+                  </span>
 
-                  <div>
-                    <label className="block text-amber-300 font-bold mb-1">Customer Selling Price (LKR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={extSellingPrice}
-                      onChange={(e) => setExtSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      onFocus={(e) => e.target.select()}
-                      placeholder="e.g. 3250"
-                      className="w-full bg-slate-950 border border-emerald-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-slate-300 text-[10px] font-semibold mb-1">Pita Shop Cost (LKR)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={extCostPrice}
+                        onChange={(e) => handleExtCostChange(e.target.value === '' ? '' : Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="2500"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200 font-mono text-xs focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-amber-300 text-[10px] font-semibold mb-1">Margin (%)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extMarginPercent}
+                          onChange={(e) => handleExtMarginChange(e.target.value === '' ? '' : Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          placeholder="30"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-amber-300 font-mono text-xs focus:border-amber-500 focus:outline-none pr-6"
+                        />
+                        <Percent className="w-3 h-3 text-slate-500 absolute right-2 top-2" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-emerald-400 text-[10px] font-bold mb-1">Bill Retail Price (LKR) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={extSellingPrice}
+                        onChange={(e) => handleExtSellingPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="3250"
+                        className="w-full bg-slate-900 border border-emerald-800 rounded-xl px-3 py-1.5 text-emerald-400 font-mono font-bold text-xs focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
+                  <p className="text-[10px] text-slate-400 italic">
+                    💡 Bill Retail Price එක වෙනස් කළ විට Margin % එක ස්වයංක්‍රීයව සෑදේ. Bill එකට එකතු වන්නේ මෙම Retail Price එකයි.
+                  </p>
                 </div>
               </div>
             )}

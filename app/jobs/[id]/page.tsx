@@ -30,6 +30,7 @@ export default function JobDetailPage() {
   const [extPartName, setExtPartName] = useState('');
   const [extCostPrice, setExtCostPrice] = useState<number | ''>(2000);
   const [extMarginPercent, setExtMarginPercent] = useState<number | ''>(30);
+  const [extRetailPrice, setExtRetailPrice] = useState<number | ''>(2600);
   const [extVendorName, setExtVendorName] = useState('');
   const [extQty, setExtQty] = useState<number | ''>(1);
   const [extSaveToInventory, setExtSaveToInventory] = useState(false);
@@ -74,6 +75,37 @@ export default function JobDetailPage() {
       const updated = jobs.filter((j) => j.id !== job.id);
       saveStoredJobs(updated);
       router.push('/jobs');
+    }
+  };
+
+  // Bi-directional price calculations for Outside Shop Parts
+  const handleExtCostChange = (val: number | '') => {
+    setExtCostPrice(val);
+    const cost = Number(val) || 0;
+    const margin = Number(extMarginPercent) || 0;
+    if (cost > 0 && margin >= 0) {
+      const retail = Number((cost + (cost * margin) / 100).toFixed(2));
+      setExtRetailPrice(retail);
+    }
+  };
+
+  const handleExtMarginChange = (val: number | '') => {
+    setExtMarginPercent(val);
+    const margin = Number(val) || 0;
+    const cost = Number(extCostPrice) || 0;
+    if (cost > 0) {
+      const retail = Number((cost + (cost * margin) / 100).toFixed(2));
+      setExtRetailPrice(retail);
+    }
+  };
+
+  const handleExtRetailPriceChange = (val: number | '') => {
+    setExtRetailPrice(val);
+    const retail = Number(val) || 0;
+    const cost = Number(extCostPrice) || 0;
+    if (cost > 0 && retail >= 0) {
+      const margin = Number((((retail - cost) / cost) * 100).toFixed(2));
+      setExtMarginPercent(margin);
     }
   };
 
@@ -146,10 +178,10 @@ export default function JobDetailPage() {
     }
 
     const costNum = Number(extCostPrice) || 0;
-    const marginNum = Number(extMarginPercent) || 0;
+    const retailNum = Number(extRetailPrice) || (costNum + (costNum * (Number(extMarginPercent) || 0)) / 100);
+    const marginNum = Number(extMarginPercent) || (costNum > 0 ? Number((((retailNum - costNum) / costNum) * 100).toFixed(2)) : 0);
     const qtyNum = Number(extQty) || 1;
-    const computedRetail = Number((costNum + (costNum * marginNum) / 100).toFixed(2));
-    const totalPrice = computedRetail * qtyNum;
+    const totalPrice = retailNum * qtyNum;
 
     // Optional: Save to shop inventory catalog for future use
     let externalPartId = 'ext-part-' + Date.now();
@@ -161,7 +193,7 @@ export default function JobDetailPage() {
         vendor_name: extVendorName || 'Outside Shop Vendor',
         cost_price: costNum,
         margin_percent: marginNum,
-        retail_price: computedRetail,
+        retail_price: retailNum,
         stock_quantity: 0, // Since it's purchased for this job
         min_stock_alert: 3,
         created_at: new Date().toISOString(),
@@ -178,7 +210,7 @@ export default function JobDetailPage() {
       part_id: externalPartId,
       part_name: `${extPartName} (Outside Purchase)`,
       quantity: qtyNum,
-      unit_price: computedRetail,
+      unit_price: retailNum,
       total_price: totalPrice,
       cost_price: costNum,
       margin_percent: marginNum,
@@ -210,6 +242,7 @@ export default function JobDetailPage() {
     setExtPartName('');
     setExtCostPrice(2000);
     setExtMarginPercent(30);
+    setExtRetailPrice(2600);
     setExtVendorName('');
     setExtQty(1);
     setExtSaveToInventory(false);
@@ -280,10 +313,6 @@ export default function JobDetailPage() {
   const laborNum = Number(laborCharge) || 0;
   const grandTotal = partsTotal + laborNum;
   const profile = getStoredProfile();
-
-  const costNum = Number(extCostPrice) || 0;
-  const marginNum = Number(extMarginPercent) || 0;
-  const extComputedRetail = Number((costNum + (costNum * marginNum) / 100).toFixed(2));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -520,7 +549,7 @@ export default function JobDetailPage() {
             {addPartMode === 'external' && (
               <div className="space-y-3 text-xs animate-in fade-in duration-200">
                 <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-300 text-[11px]">
-                  💡 පිට කඩෙන් ගෙනා කොටස් (External Shop Parts) සදහා Cost Price එක හා Profit Margin % එක ලබාදී Retail Customer Price එක සකස් කරන්න.
+                  💡 පිට කඩෙන් ගෙනා කොටස් (External Shop Parts) සදහා Cost Price එක, Profit Margin % එක හෝ Bill Retail Price එක වෙනස් කළ හැක.
                 </div>
 
                 <div>
@@ -535,43 +564,58 @@ export default function JobDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Pita Shop Cost (LKR)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={extCostPrice}
-                      onChange={(e) => setExtCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      onFocus={(e) => e.target.select()}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
-                    />
-                  </div>
+                {/* 3-Way Bi-Directional Pricing Box for Outside Shop Parts */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="text-[11px] font-bold text-amber-400 block">
+                    💰 Outside Shop Bi-Directional Pricing Engine
+                  </span>
 
-                  <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Profit Margin (%)</label>
-                    <div className="relative">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-slate-300 text-[10px] font-semibold mb-1">Pita Shop Cost (LKR)</label>
                       <input
                         type="number"
                         min="0"
-                        required
-                        value={extMarginPercent}
-                        onChange={(e) => setExtMarginPercent(e.target.value === '' ? '' : Number(e.target.value))}
+                        value={extCostPrice}
+                        onChange={(e) => handleExtCostChange(e.target.value === '' ? '' : Number(e.target.value))}
                         onFocus={(e) => e.target.select()}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-mono focus:border-amber-500 focus:outline-none"
+                        placeholder="2000"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200 font-mono text-xs focus:border-amber-500 focus:outline-none"
                       />
-                      <Percent className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
+                    </div>
+
+                    <div>
+                      <label className="block text-amber-300 text-[10px] font-semibold mb-1">Margin (%)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={extMarginPercent}
+                          onChange={(e) => handleExtMarginChange(e.target.value === '' ? '' : Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          placeholder="30"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-amber-300 font-mono text-xs focus:border-amber-500 focus:outline-none pr-6"
+                        />
+                        <Percent className="w-3 h-3 text-slate-500 absolute right-2 top-2" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-emerald-400 text-[10px] font-bold mb-1">Bill Retail Price (LKR) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={extRetailPrice}
+                        onChange={(e) => handleExtRetailPriceChange(e.target.value === '' ? '' : Number(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="2600"
+                        className="w-full bg-slate-900 border border-emerald-800 rounded-xl px-3 py-1.5 text-emerald-400 font-mono font-bold text-xs focus:border-emerald-500 focus:outline-none"
+                      />
                     </div>
                   </div>
-                </div>
-
-                {/* Computed Customer Retail Price Preview */}
-                <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-300">Customer Retail Price:</span>
-                  <span className="font-mono font-extrabold text-emerald-400 text-sm">
-                    LKR {extComputedRetail.toLocaleString()}
-                  </span>
+                  <p className="text-[10px] text-slate-400 italic">
+                    💡 Bill Retail Price එක වෙනස් කළ විට Margin % එක ස්වයංක්‍රීයව වෙනස් වේ. Bill එකට එකතු වන්නේ මෙම Retail Price එකයි.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
