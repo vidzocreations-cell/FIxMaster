@@ -84,6 +84,15 @@ export interface JobCard {
   updated_at?: string;
 }
 
+export interface Technician {
+  id: string;
+  name: string;
+  specialization: string;
+  phone: string;
+  status: 'Active' | 'Inactive';
+  created_at?: string;
+}
+
 export type PaymentMethod = 'Cash' | 'Card' | 'Mobile Payment' | 'Bank Transfer';
 
 export interface Invoice {

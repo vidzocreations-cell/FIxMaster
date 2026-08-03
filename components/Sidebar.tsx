@@ -3,12 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Wrench, CreditCard, History, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, Wrench, CreditCard, History, Settings, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
   { label: 'Inventory & Parts', href: '/inventory', icon: Package },
   { label: 'Repair Job Cards', href: '/jobs', icon: Wrench },
+  { label: 'Technicians', href: '/technicians', icon: Users },
   { label: 'POS Terminal', href: '/pos', icon: CreditCard },
   { label: 'Sales History', href: '/sales', icon: History },
   { label: 'Settings & Cloud', href: '/settings', icon: Settings },

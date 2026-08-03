@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store } from 'lucide-react';
-import { EQUIPMENT_CATEGORIES, JobCard, EquipmentCategory, JobPart } from '@/lib/types';
-import { getStoredJobs, saveStoredJobs } from '@/lib/supabase';
+import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician } from '@/lib/types';
+import { getStoredJobs, saveStoredJobs, getStoredTechnicians } from '@/lib/supabase';
 
 interface JobCardModalProps {
   isOpen: boolean;
@@ -23,7 +23,8 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [reportedFault, setReportedFault] = useState('');
   const [laborCharge, setLaborCharge] = useState(1500);
   const [advanceDeposit, setAdvanceDeposit] = useState(0);
-  const [assignedTechnician, setAssignedTechnician] = useState('Saman Kumara');
+  const [assignedTechnician, setAssignedTechnician] = useState('');
+  const [techniciansList, setTechniciansList] = useState<Technician[]>([]);
 
   // Outside Shop Parts Fields (පිට කඩෙන් ගෙනා කොටස්)
   const [hasExternalParts, setHasExternalParts] = useState(false);
@@ -34,9 +35,17 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    const techs = getStoredTechnicians().filter((t) => t.status === 'Active');
+    setTechniciansList(techs);
+    if (techs.length > 0 && !assignedTechnician) {
+      setAssignedTechnician(techs[0].name);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
+    const techs = getStoredTechnicians().filter((t) => t.status === 'Active');
+    setTechniciansList(techs);
+
     if (jobToEdit) {
       setCustomerName(jobToEdit.customer_name);
       setPhoneNumber(jobToEdit.phone_number);
@@ -46,7 +55,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setReportedFault(jobToEdit.reported_fault);
       setLaborCharge(jobToEdit.labor_charge);
       setAdvanceDeposit(jobToEdit.advance_deposit || 0);
-      setAssignedTechnician(jobToEdit.assigned_technician_name || 'Saman Kumara');
+      setAssignedTechnician(jobToEdit.assigned_technician_name || (techs[0]?.name ?? 'Saman Kumara'));
       setHasExternalParts(!!jobToEdit.has_external_parts);
       setExtShopName(jobToEdit.ext_shop_name || '');
       setExtPartName(jobToEdit.ext_part_name || '');
@@ -61,7 +70,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setReportedFault('');
       setLaborCharge(1500);
       setAdvanceDeposit(0);
-      setAssignedTechnician('Saman Kumara');
+      setAssignedTechnician(techs[0]?.name ?? 'Saman Kumara');
       setHasExternalParts(false);
       setExtShopName('');
       setExtPartName('');
@@ -72,11 +81,10 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
   if (!isOpen || !mounted) return null;
 
-  // Auto calculate default selling price when cost price is typed if selling price is empty
   const handleCostPriceChange = (val: number) => {
     setExtCostPrice(val);
     if (val > 0 && (extSellingPrice === '' || extSellingPrice === 0)) {
-      setExtSellingPrice(Math.round(val + val * 0.3)); // Default 30% margin
+      setExtSellingPrice(Math.round(val + val * 0.3));
     }
   };
 
@@ -295,6 +303,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               />
             </div>
 
+            {/* Dynamic Assigned Technician Dropdown */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Assigned Technician</label>
               <select
@@ -302,9 +311,15 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 onChange={(e) => setAssignedTechnician(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
               >
-                <option value="Saman Kumara">Saman Kumara (Senior Tech)</option>
-                <option value="Ruwan Dissayake">Ruwan Dissayake (Motor Specialist)</option>
-                <option value="Kavinda Perera">Kavinda Perera (General Tech)</option>
+                {techniciansList.length === 0 ? (
+                  <option value="Saman Kumara">Saman Kumara (Senior Tech)</option>
+                ) : (
+                  techniciansList.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} ({t.specialization})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -434,7 +449,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-955 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </button>

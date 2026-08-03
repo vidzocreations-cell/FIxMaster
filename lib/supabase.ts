@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { JobCard, Part, Invoice, BusinessProfile } from './types';
+import { JobCard, Part, Invoice, BusinessProfile, Technician } from './types';
 
 const HARDCODED_SUPABASE_URL = 'https://emvbsjturokhyjpeoiiv.supabase.co';
 const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-LypOTejP6u60giaxA_sk76E7d9';
@@ -14,6 +14,12 @@ const INITIAL_BUSINESS_PROFILE: BusinessProfile = {
   job_prefix: 'JOB-',
   default_margin: 30,
 };
+
+export const INITIAL_TECHNICIANS: Technician[] = [
+  { id: 'tech-1', name: 'Saman Kumara', specialization: 'Senior Motor & Engine Specialist', phone: '0771234567', status: 'Active', created_at: new Date().toISOString() },
+  { id: 'tech-2', name: 'Ruwan Dissayake', specialization: 'Chainsaw & Generator Expert', phone: '0719876543', status: 'Active', created_at: new Date().toISOString() },
+  { id: 'tech-3', name: 'Kavinda Perera', specialization: 'General Power Tools Tech', phone: '0755554433', status: 'Active', created_at: new Date().toISOString() },
+];
 
 const INITIAL_PARTS: Part[] = [
   {
@@ -70,6 +76,33 @@ export function getSupabaseClient() {
     cachedClient = createClient(HARDCODED_SUPABASE_URL, HARDCODED_SUPABASE_KEY);
   }
   return cachedClient;
+}
+
+// Technicians Storage Helpers
+export function getStoredTechnicians(): Technician[] {
+  if (typeof window === 'undefined') return INITIAL_TECHNICIANS;
+  const data = localStorage.getItem('fixmaster_technicians');
+  if (!data) {
+    localStorage.setItem('fixmaster_technicians', JSON.stringify(INITIAL_TECHNICIANS));
+    return INITIAL_TECHNICIANS;
+  }
+  try {
+    return JSON.parse(data);
+  } catch {
+    return INITIAL_TECHNICIANS;
+  }
+}
+
+export function saveStoredTechnicians(technicians: Technician[]) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_technicians', JSON.stringify(technicians));
+  }
+}
+
+export function deleteStoredTechnician(techId: string) {
+  const techs = getStoredTechnicians();
+  const updated = techs.filter((t) => t.id !== techId);
+  saveStoredTechnicians(updated);
 }
 
 // LocalStorage Persistence Helpers
@@ -210,8 +243,6 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_jobs', JSON.stringify(cloudJobs));
-      localStorage.setItem('fixmaster_sb_key', HARDCODED_SUPABASE_KEY);
-      localStorage.setItem('fixmaster_sb_url', HARDCODED_SUPABASE_URL);
     }
     return cloudJobs;
   } catch (e) {
