@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Printer, CheckCircle, Wrench, Phone, MapPin } from 'lucide-react';
+import { X, Printer, Wrench, Phone, MapPin, CheckCircle2, QrCode } from 'lucide-react';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 
 interface ThermalReceiptModalProps {
@@ -23,142 +23,167 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
   const parts = targetJob?.parts || [];
   const labor = targetJob?.labor_charge || 0;
   const deposit = targetJob?.advance_deposit || 0;
+  const docNo = invoice ? invoice.invoice_no : targetJob?.job_no || 'TICKET-001';
+  const createdDate = invoice ? new Date(invoice.created_at) : new Date();
+
+  const partsTotal = parts.reduce((a, b) => a + b.total_price, 0);
+  const subtotal = invoice ? invoice.subtotal : partsTotal + labor;
+  const discount = invoice ? invoice.discount : 0;
+  const netPayable = invoice ? invoice.net_payable : Math.max(0, subtotal - deposit - discount);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between no-print border-b border-slate-800 pb-3">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            <Printer className="w-4 h-4 text-cyan-400" /> Printable Receipt Preview
-          </h2>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+        {/* Top Modal Controls (Screen Only) */}
+        <div className="flex items-center justify-between no-print border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40">
+          <div className="flex items-center gap-2">
+            <Printer className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-sm sm:text-base font-bold text-white">POS Thermal Receipt & Invoice Preview</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Printable Area */}
-        <div className="print-area bg-white text-black p-6 rounded-xl font-mono text-xs shadow-md space-y-4">
+        {/* Printable Area (Thermal Receipt Roll 80mm Layout) */}
+        <div className="print-area bg-white text-black p-4 sm:p-5 rounded-xl font-mono text-[12px] leading-snug shadow-inner space-y-3 border border-gray-200">
           {/* Header */}
-          <div className="text-center border-b border-dashed border-gray-300 pb-4 space-y-1">
-            <h1 className="font-extrabold text-base uppercase tracking-wider">{profile.shop_name}</h1>
-            <p className="text-[11px] text-gray-600 flex items-center justify-center gap-1">
-              <MapPin className="w-3 h-3" /> {profile.address}
-            </p>
-            <p className="text-[11px] text-gray-600 flex items-center justify-center gap-1">
-              <Phone className="w-3 h-3" /> {profile.phone}
-            </p>
+          <div className="text-center pb-2 border-b-2 border-dashed border-black space-y-1">
+            <h1 className="font-extrabold text-base sm:text-lg uppercase tracking-wider text-black">{profile.shop_name}</h1>
+            <p className="text-[11px] font-semibold text-black">{profile.address}</p>
+            <p className="text-[11px] font-semibold text-black">Tel: {profile.phone}</p>
+            <p className="text-[10px] text-gray-800">Email: {profile.email}</p>
           </div>
 
-          {/* Ticket / Invoice Metadata */}
-          <div className="flex justify-between text-[11px] text-gray-700 py-1 border-b border-gray-200">
+          {/* Document Title & Number */}
+          <div className="text-center py-1 bg-gray-100 border-y border-black font-extrabold text-xs uppercase tracking-widest">
+            {invoice ? 'TAX INVOICE / RECEIPT' : 'REPAIR SERVICE JOB TICKET'}
+          </div>
+
+          {/* Receipt Info Grid */}
+          <div className="grid grid-cols-2 text-[11px] py-1 border-b border-dashed border-gray-400 gap-1">
             <div>
-              <p><span className="font-bold">Doc #:</span> {invoice ? invoice.invoice_no : targetJob?.job_no}</p>
-              <p><span className="font-bold">Customer:</span> {targetJob?.customer_name || invoice?.customer_name}</p>
+              <p><span className="font-bold">Doc No:</span> {docNo}</p>
+              <p><span className="font-bold">Cust:</span> {targetJob?.customer_name || invoice?.customer_name}</p>
               <p><span className="font-bold">Phone:</span> {targetJob?.phone_number || invoice?.phone_number}</p>
             </div>
             <div className="text-right">
-              <p><span className="font-bold">Date:</span> {new Date().toLocaleDateString()}</p>
-              <p><span className="font-bold">Category:</span> {targetJob?.machine_category}</p>
-              <p><span className="font-bold">Model:</span> {targetJob?.brand_model}</p>
+              <p><span className="font-bold">Date:</span> {createdDate.toLocaleDateString()}</p>
+              <p><span className="font-bold">Time:</span> {createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              <p><span className="font-bold">Tech:</span> {targetJob?.assigned_technician_name || 'Staff'}</p>
             </div>
           </div>
 
-          {/* Machine & Fault Details */}
+          {/* Machine Info */}
           {targetJob && (
-            <div className="bg-gray-50 p-2 rounded border border-gray-200 text-[11px]">
-              <p className="font-bold text-gray-900">Reported Fault:</p>
-              <p className="text-gray-700">{targetJob.reported_fault}</p>
-              {targetJob.serial_number && <p className="text-[10px] text-gray-500 mt-1">Serial: {targetJob.serial_number}</p>}
+            <div className="p-2 bg-gray-100 rounded border border-gray-300 text-[11px] space-y-0.5">
+              <div className="flex justify-between font-bold text-black">
+                <span>{targetJob.machine_category}</span>
+                <span>{targetJob.brand_model}</span>
+              </div>
+              {targetJob.serial_number && <p className="text-[10px] text-gray-700">S/N: {targetJob.serial_number}</p>}
+              <p className="text-[10px] text-gray-800"><span className="font-bold">Fault:</span> {targetJob.reported_fault}</p>
             </div>
           )}
 
-          {/* Items Breakdown Table */}
-          <table className="w-full text-[11px] text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-300 font-bold text-gray-700">
-                <th className="py-1">Description</th>
-                <th className="py-1 text-center">Qty</th>
-                <th className="py-1 text-right">Price</th>
-                <th className="py-1 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {parts.map((p) => (
-                <tr key={p.id}>
-                  <td className="py-1 text-gray-800">{p.part_name}</td>
-                  <td className="py-1 text-center">{p.quantity}</td>
-                  <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
-                  <td className="py-1 text-right font-semibold">{p.total_price.toLocaleString()}</td>
+          {/* Line Items Table */}
+          <div className="py-1">
+            <table className="w-full text-[11px] text-left border-collapse">
+              <thead>
+                <tr className="border-b-2 border-black font-bold uppercase text-[10px]">
+                  <th className="py-1">Item / Description</th>
+                  <th className="py-1 text-center">Qty</th>
+                  <th className="py-1 text-right">Price</th>
+                  <th className="py-1 text-right">Total</th>
                 </tr>
-              ))}
-              <tr>
-                <td className="py-1 font-semibold text-gray-800" colSpan={3}>Service & Labor Charge</td>
-                <td className="py-1 text-right font-semibold">{labor.toLocaleString()}</td>
-              </tr>
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {parts.map((p, idx) => (
+                  <tr key={p.id || idx}>
+                    <td className="py-1 text-black font-medium">{p.part_name}</td>
+                    <td className="py-1 text-center">{p.quantity}</td>
+                    <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
+                    <td className="py-1 text-right font-bold">{p.total_price.toLocaleString()}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="py-1 font-bold text-black" colSpan={3}>Service & Labor Charge</td>
+                  <td className="py-1 text-right font-bold">{labor.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          {/* Summary Financials */}
-          <div className="border-t border-dashed border-gray-300 pt-3 space-y-1 text-right font-mono text-[11px]">
-            {parts.length > 0 && (
-              <div className="flex justify-between text-gray-600">
-                <span>Spare Parts Total:</span>
-                <span>LKR {parts.reduce((a, b) => a + b.total_price, 0).toLocaleString()}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-gray-600">
-              <span>Labor Charge:</span>
-              <span>LKR {labor.toLocaleString()}</span>
+          {/* Financial Totals */}
+          <div className="border-t-2 border-dashed border-black pt-2 space-y-1 text-right text-[11px]">
+            <div className="flex justify-between">
+              <span>Gross Subtotal:</span>
+              <span className="font-bold">LKR {subtotal.toLocaleString()}</span>
             </div>
+
             {deposit > 0 && (
-              <div className="flex justify-between text-amber-700 font-semibold">
+              <div className="flex justify-between font-bold">
                 <span>Advance Deposit Paid:</span>
                 <span>- LKR {deposit.toLocaleString()}</span>
               </div>
             )}
-            {invoice && invoice.discount > 0 && (
-              <div className="flex justify-between text-red-600">
-                <span>Discount Applied:</span>
-                <span>- LKR {invoice.discount.toLocaleString()}</span>
+
+            {discount > 0 && (
+              <div className="flex justify-between font-bold">
+                <span>Discount Allowed:</span>
+                <span>- LKR {discount.toLocaleString()}</span>
               </div>
             )}
-            <div className="flex justify-between font-extrabold text-sm text-gray-900 border-t border-gray-300 pt-2">
+
+            <div className="flex justify-between font-extrabold text-sm sm:text-base border-t-2 border-black pt-1 mt-1 text-black">
               <span>NET PAYABLE:</span>
-              <span>LKR {(invoice ? invoice.net_payable : (targetJob?.total_amount || 0) - deposit).toLocaleString()}</span>
+              <span>LKR {netPayable.toLocaleString()}</span>
             </div>
+
             {invoice && (
-              <div className="flex justify-between text-gray-500 text-[10px] pt-1">
+              <div className="flex justify-between text-[10px] pt-1 text-gray-800">
                 <span>Payment Mode:</span>
-                <span className="font-bold">{invoice.payment_method}</span>
+                <span className="font-extrabold uppercase">{invoice.payment_method} (PAID)</span>
               </div>
             )}
           </div>
 
-          {/* Footer Note & Signatures */}
-          <div className="text-center text-[10px] text-gray-500 border-t border-dashed border-gray-300 pt-3 space-y-3">
-            <p>Thank you for choosing {profile.shop_name}!</p>
-            <p className="italic">Warranty applicable only on replaced parts with original receipt within 30 days.</p>
+          {/* Terms & Barcode Visual */}
+          <div className="text-center text-[10px] border-t border-dashed border-black pt-3 space-y-2">
+            <p className="font-bold">*** THANK YOU FOR YOUR BUSINESS ***</p>
+            <p className="text-[9px] text-gray-700">30-day warranty applies to replaced parts with this original receipt.</p>
             
-            <div className="flex justify-between pt-6 text-[9px] text-gray-400">
-              <span className="border-t border-gray-400 px-3">Customer Signature</span>
-              <span className="border-t border-gray-400 px-3">Authorized Stamp / Sign</span>
+            {/* Barcode Visual */}
+            <div className="pt-1 flex flex-col items-center justify-center">
+              <div className="font-mono text-sm tracking-[0.25em] font-extrabold text-black selection:bg-none">
+                |||||| | |||| ||| ||||||| ||| |||
+              </div>
+              <span className="text-[9px] text-gray-600 font-mono mt-0.5">{docNo}</span>
+            </div>
+
+            <div className="flex justify-between pt-5 text-[9px] text-gray-600">
+              <span className="border-t border-gray-600 px-2">Customer Signature</span>
+              <span className="border-t border-gray-600 px-2">Authorized Stamp</span>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls (Screen Only) */}
         <div className="no-print flex items-center gap-3 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-xl text-xs text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
           >
-            Close
+            Cancel
           </button>
           <button
             onClick={handlePrint}
-            className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> Print Receipt
+            <Printer className="w-4 h-4" /> Print Thermal Receipt
           </button>
         </div>
       </div>
