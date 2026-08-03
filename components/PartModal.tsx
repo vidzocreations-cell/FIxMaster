@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Package, Tag, DollarSign, Percent, AlertTriangle } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, Part, EquipmentCategory } from '@/lib/types';
 import { getStoredParts, saveStoredParts } from '@/lib/supabase';
@@ -13,6 +14,7 @@ interface PartModalProps {
 }
 
 export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: PartModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [partName, setPartName] = useState('');
   const [category, setCategory] = useState<EquipmentCategory>('Chainsaws');
   const [vendorName, setVendorName] = useState('');
@@ -21,6 +23,10 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
   const [retailPrice, setRetailPrice] = useState<number | ''>(650);
   const [stockQuantity, setStockQuantity] = useState<number | ''>(10);
   const [minStockAlert, setMinStockAlert] = useState<number | ''>(5);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (partToEdit) {
@@ -44,11 +50,10 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     }
   }, [partToEdit, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // Bi-directional pricing engine:
 
-  // 1. When Cost Price changes
   const handleCostPriceChange = (costVal: number) => {
     setCostPrice(costVal);
     const currMargin = Number(marginPercent) || 0;
@@ -58,7 +63,6 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     }
   };
 
-  // 2. When Selling Price (Retail Price) changes -> Auto calculate Margin %
   const handleRetailPriceChange = (retailVal: number) => {
     setRetailPrice(retailVal);
     const currCost = Number(costPrice) || 0;
@@ -68,7 +72,6 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     }
   };
 
-  // 3. When Margin % changes -> Auto calculate Selling Price
   const handleMarginPercentChange = (marginVal: number) => {
     setMarginPercent(marginVal);
     const currCost = Number(costPrice) || 0;
@@ -124,10 +127,10 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 p-3 sm:p-6 flex items-start sm:items-center justify-center">
-      <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-950/90 backdrop-blur-md z-20">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-3 sm:p-6 flex items-start justify-center min-h-screen">
+      <div className="w-full max-w-lg bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative my-auto max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-30">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-cyan-400" />
             <h2 className="text-base sm:text-lg font-bold text-white">
@@ -153,7 +156,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
               value={partName}
               onChange={(e) => setPartName(e.target.value)}
               placeholder="e.g. Chainsaw Carburetor Gasket Kit"
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
@@ -166,7 +169,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as EquipmentCategory)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
+                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
                 >
                   {EQUIPMENT_CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
@@ -185,13 +188,13 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 value={vendorName}
                 onChange={(e) => setVendorName(e.target.value)}
                 placeholder="e.g. Stihl Lanka / Singer"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Pricing Engine Box (Two-Way Bi-Directional Auto Calculation) */}
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div className="p-3.5 rounded-xl bg-slate-955 border border-slate-800 space-y-3">
             <h3 className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
               <DollarSign className="w-4 h-4" /> Pricing & Margin Engine (Bi-Directional Calculation)
             </h3>
@@ -210,7 +213,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   value={costPrice}
                   onChange={(e) => handleCostPriceChange(Number(e.target.value))}
                   placeholder="500"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
                 />
               </div>
 
@@ -224,7 +227,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   value={retailPrice}
                   onChange={(e) => handleRetailPriceChange(Number(e.target.value))}
                   placeholder="650"
-                  className="w-full bg-slate-950 border border-emerald-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-emerald-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -239,7 +242,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                     value={marginPercent}
                     onChange={(e) => handleMarginPercentChange(Number(e.target.value))}
                     placeholder="30"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono focus:border-cyan-500 focus:outline-none pr-6"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono focus:border-cyan-500 focus:outline-none pr-6"
                   />
                   <Percent className="w-3 h-3 text-slate-500 absolute right-2 top-2.5" />
                 </div>
@@ -257,7 +260,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                 required
                 value={stockQuantity}
                 onChange={(e) => setStockQuantity(Number(e.target.value))}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
 
@@ -271,18 +274,18 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
                   required
                   value={minStockAlert}
                   onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-955 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-950/90 backdrop-blur-md z-20">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-30">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-900 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-955 border border-slate-800 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -297,4 +300,6 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

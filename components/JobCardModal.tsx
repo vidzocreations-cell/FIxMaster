@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobCard, EquipmentCategory, JobPart } from '@/lib/types';
 import { getStoredJobs, saveStoredJobs } from '@/lib/supabase';
@@ -13,6 +14,7 @@ interface JobCardModalProps {
 }
 
 export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: JobCardModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [machineCategory, setMachineCategory] = useState<EquipmentCategory>('Chainsaws');
@@ -29,6 +31,10 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [extPartName, setExtPartName] = useState('');
   const [extCostPrice, setExtCostPrice] = useState<number | ''>('');
   const [extSellingPrice, setExtSellingPrice] = useState<number | ''>('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (jobToEdit) {
@@ -64,7 +70,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     }
   }, [jobToEdit, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // Auto calculate default selling price when cost price is typed if selling price is empty
   const handleCostPriceChange = (val: number) => {
@@ -87,7 +93,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         if (j.id === jobToEdit.id) {
           let updatedParts = j.parts || [];
 
-          // If external part info is filled, attach it to parts list if not already present
           if (hasExternalParts && extPartName.trim() && sellingNum > 0) {
             const extJobPart: JobPart = {
               id: 'jp-ext-' + Date.now(),
@@ -186,10 +191,10 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 p-3 sm:p-6 flex items-start sm:items-center justify-center">
-      <div className="w-full max-w-xl glass-panel rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-950/90 backdrop-blur-md z-20">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-3 sm:p-6 flex items-start justify-center min-h-screen">
+      <div className="w-full max-w-xl bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative my-auto max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-30">
           <div className="flex items-center gap-2">
             <Wrench className="w-5 h-5 text-cyan-400" />
             <h2 className="text-base sm:text-lg font-bold text-white">
@@ -218,7 +223,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Kamal Perera"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -234,7 +239,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="e.g. 0771234567"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -249,7 +254,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 <select
                   value={machineCategory}
                   onChange={(e) => setMachineCategory(e.target.value as EquipmentCategory)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none appearance-none cursor-pointer"
                 >
                   {EQUIPMENT_CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
@@ -269,7 +274,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 value={brandModel}
                 onChange={(e) => setBrandModel(e.target.value)}
                 placeholder="e.g. Stihl MS180 / Makita GA4030"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
@@ -283,7 +288,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="e.g. SN-883920"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
 
@@ -292,7 +297,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               <select
                 value={assignedTechnician}
                 onChange={(e) => setAssignedTechnician(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
               >
                 <option value="Saman Kumara">Saman Kumara (Senior Tech)</option>
                 <option value="Ruwan Dissayake">Ruwan Dissayake (Motor Specialist)</option>
@@ -312,7 +317,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 value={reportedFault}
                 onChange={(e) => setReportedFault(e.target.value)}
                 placeholder="Describe fault (e.g. Engine starting issue, smoke from motor, broken switch)"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
@@ -335,7 +340,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
             {hasExternalParts && (
               <div className="space-y-3 pt-2 border-t border-amber-900/40 text-xs animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Outside Shop Name */}
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Outside Shop Name (පිට කඩේ නම)</label>
                     <div className="relative">
@@ -345,12 +349,11 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                         value={extShopName}
                         onChange={(e) => setExtShopName(e.target.value)}
                         placeholder="e.g. Pettah Hardware / Stihl Dealer"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Part Name */}
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Part Name (කොටසේ නම)</label>
                     <input
@@ -358,13 +361,12 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       value={extPartName}
                       onChange={(e) => setExtPartName(e.target.value)}
                       placeholder="e.g. Stihl MS180 Carburetor"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Cost Price */}
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Outside Purchase Cost Price (LKR)</label>
                     <input
@@ -373,11 +375,10 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       value={extCostPrice}
                       onChange={(e) => handleCostPriceChange(Number(e.target.value))}
                       placeholder="e.g. 2500"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:border-amber-500 focus:outline-none"
                     />
                   </div>
 
-                  {/* Selling Price */}
                   <div>
                     <label className="block text-amber-300 font-bold mb-1">Customer Selling Price (LKR)</label>
                     <input
@@ -386,7 +387,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                       value={extSellingPrice}
                       onChange={(e) => setExtSellingPrice(Number(e.target.value))}
                       placeholder="e.g. 3250"
-                      className="w-full bg-slate-900 border border-emerald-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-slate-950 border border-emerald-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -395,7 +396,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
           </div>
 
           {/* Financials: Estimated Labor Charge & Advance Deposit */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Estimated Labor Charge (LKR)</label>
               <div className="relative">
@@ -405,7 +406,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   min="0"
                   value={laborCharge}
                   onChange={(e) => setLaborCharge(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -419,18 +420,18 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                   min="0"
                   value={advanceDeposit}
                   onChange={(e) => setAdvanceDeposit(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-950/90 backdrop-blur-md z-20">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-30">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-900 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -445,4 +446,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
