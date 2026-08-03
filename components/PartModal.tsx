@@ -125,16 +125,17 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-800 p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 p-3 sm:p-6 flex items-start sm:items-center justify-center">
+      <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-950/90 backdrop-blur-md z-20">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-lg font-bold text-white">
+            <h2 className="text-base sm:text-lg font-bold text-white">
               {partToEdit ? 'Edit Spare Part Item' : 'Add New Spare Part Item'}
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
           >
@@ -198,7 +199,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
               💡 Selling Price (විකුණුම් මිල) ලබාදුන් විට Profit Margin % එකද, Margin % ලබාදුන් විට Selling Price එකද Auto සාදාගනී.
             </p>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Cost Price */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">Cost Price (LKR)</label>
@@ -277,7 +278,7 @@ export default function PartModal({ isOpen, onClose, partToEdit, onSaved }: Part
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-950/90 backdrop-blur-md z-20">
             <button
               type="button"
               onClick={onClose}
