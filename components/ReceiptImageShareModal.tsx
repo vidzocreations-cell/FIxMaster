@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Download, Image as ImageIcon, Loader2, MessageSquare, Check } from 'lucide-react';
+import { X, Share2, Download, Image as ImageIcon, Loader2, Check } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
@@ -261,35 +261,6 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
     handleDownload();
   };
 
-  const handleDirectWhatsApp = () => {
-    const rawPhone = invoice?.phone_number || jobCard?.phone_number || '';
-    let cleanPhone = rawPhone.replace(/\D/g, '');
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '94' + cleanPhone.substring(1);
-    }
-
-    const profile = getStoredProfile();
-    const shopName = profile.shop_name || 'FixMaster Repair Center';
-
-    // Save photo
-    handleDownload();
-
-    const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const msgText = encodeURIComponent(
-      `🧾 *${shopName}*\n` +
-      `Receipt *${docNo}*\n\n` +
-      `🖼️ (Saved receipt photo to your device - attach to chat!)`
-    );
-
-    if (isMobile) {
-      window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${msgText}`;
-    } else {
-      window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${msgText}`, '_blank');
-    }
-
-    setStatusNotice('✓ Saved Photo & Opening WhatsApp!');
-  };
-
   if (!isOpen || !mounted) return null;
 
   const modalContent = (
@@ -299,7 +270,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share Options</h2>
+            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo Preview</h2>
           </div>
           <button
             type="button"
@@ -332,46 +303,33 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
                 alt="Receipt Preview"
                 className="max-h-[320px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
               />
-              <p className="text-[11px] text-slate-400">Receipt photo ready! Tap orange button to open phone share menu</p>
             </div>
           ) : (
             <p className="text-xs text-red-400">Failed to render receipt image.</p>
           )}
         </div>
 
-        {/* Action Controls Grid */}
-        <div className="space-y-2 pt-1">
-          {/* Main Mobile Native Share Sheet Button (Honor / MIUI / Android / iOS share page) */}
+        {/* Action Controls Grid (Only 2 Clean Buttons: Save Photo & Mobile Share Option) */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Save Photo */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!imageUri || isGenerating}
+            className="py-3.5 rounded-xl text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-4 h-4 text-cyan-400" /> Save Photo
+          </button>
+
+          {/* Main Mobile Native Share Sheet Button */}
           <button
             type="button"
             onClick={handleNativeShare}
             disabled={!imageUri || isGenerating}
-            className="w-full py-3.5 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="py-3.5 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <Share2 className="w-4.5 h-4.5 text-slate-950" /> Mobile App Options (Open Phone Share Page)
+            <Share2 className="w-4 h-4 text-slate-950" /> Mobile Share Option
           </button>
-
-          <div className="grid grid-cols-2 gap-2">
-            {/* Direct WhatsApp App Launcher */}
-            <button
-              type="button"
-              onClick={handleDirectWhatsApp}
-              disabled={!imageUri || isGenerating}
-              className="py-2.5 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-950 border border-emerald-800/80 hover:bg-emerald-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp Direct
-            </button>
-
-            {/* Save Photo */}
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={!imageUri || isGenerating}
-              className="py-2.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800/80 hover:bg-cyan-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5 text-cyan-400" /> Save Photo
-            </button>
-          </div>
         </div>
       </div>
     </div>
