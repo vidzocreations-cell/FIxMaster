@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, Wrench, Phone, MapPin, CheckCircle2, QrCode } from 'lucide-react';
+import { X, Printer, Wrench, Phone, MapPin, CheckCircle2, QrCode, Image, Loader2, Share2 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { Invoice, JobCard, BusinessProfile, JobPart } from '@/lib/types';
 import { getStoredJobs } from '@/lib/supabase';
 
@@ -16,6 +17,8 @@ interface ThermalReceiptModalProps {
 
 export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard, profile }: ThermalReceiptModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -27,11 +30,42 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
     window.print();
   };
 
+  const handleShareOrDownloadImage = async () => {
+    if (!receiptRef.current) return;
+    setIsGeneratingImage(true);
+
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
+      const dataUrl = canvas.toDataURL('image/png');
+      const blob = await (await fetch(dataUrl)).blob();
+
+      const docNo = invoice ? invoice.invoice_no : jobCard?.job_no || 'RECEIPT';
+      const receiptFile = new File([blob], `${docNo}_receipt.png`, { type: 'image/png' });
+
+      if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [receiptFile] })) {
+        await navigator.share({
+          files: [receiptFile],
+          title: `Receipt ${docNo}`,
+          text: `FixMaster Receipt ${docNo}`,
+        });
+      } else {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${docNo}_receipt.png`;
+        link.click();
+      }
+    } catch (err) {
+      console.error('Error sharing image:', err);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
   // Find job card either directly or via stored jobs matching invoice
   let targetJob: JobCard | null | undefined = jobCard || invoice?.job_card;
   if (!targetJob && invoice) {
     const allJobs = getStoredJobs();
-    targetJob = allJobs.find(j => j.id === invoice.job_card_id || j.customer_name === invoice.customer_name);
+    targetJob = allJobs.find((j) => j.id === invoice.job_card_id || j.customer_name === invoice.customer_name);
   }
 
   let parts: JobPart[] = targetJob?.parts || [];
@@ -39,27 +73,29 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
   // Fallback: If parts array is empty but ext_part_name exists, construct the outside shop part
   if (parts.length === 0 && targetJob?.ext_part_name) {
     const sellingNum = targetJob.ext_selling_price || targetJob.ext_cost_price || 0;
-    parts = [{
-      id: 'ext-' + (targetJob.id || '1'),
-      job_card_id: targetJob.id || '',
-      part_id: 'ext-part',
-      part_name: `${targetJob.ext_part_name} (Outside Shop)`,
-      quantity: 1,
-      unit_price: sellingNum,
-      total_price: sellingNum,
-      cost_price: targetJob.ext_cost_price || 0,
-      margin_percent: 0,
-      is_external: true
-    }];
+    parts = [
+      {
+        id: 'ext-' + (targetJob.id || '1'),
+        job_card_id: targetJob.id || '',
+        part_id: 'ext-part',
+        part_name: `${targetJob.ext_part_name} (Outside Shop)`,
+        quantity: 1,
+        unit_price: sellingNum,
+        total_price: sellingNum,
+        cost_price: targetJob.ext_cost_price || 0,
+        margin_percent: 0,
+        is_external: true,
+      },
+    ];
   }
 
   const labor = targetJob?.labor_charge || 0;
   const deposit = targetJob?.advance_deposit || 0;
   const docNo = invoice ? invoice.invoice_no : targetJob?.job_no || 'TICKET-001';
-  const createdDate = invoice ? new Date(invoice.created_at) : (targetJob ? new Date(targetJob.created_at) : new Date());
+  const createdDate = invoice ? new Date(invoice.created_at) : targetJob ? new Date(targetJob.created_at) : new Date();
 
   const partsTotal = parts.reduce((a, b) => a + b.total_price, 0);
-  const subtotal = invoice ? invoice.subtotal : (partsTotal + labor);
+  const subtotal = invoice ? invoice.subtotal : partsTotal + labor;
   const discount = invoice ? invoice.discount : 0;
   const netPayable = invoice ? invoice.net_payable : Math.max(0, subtotal - deposit - discount);
 
@@ -84,7 +120,7 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
         </div>
 
         {/* Printable Area (Thermal Receipt Roll 80mm Layout) */}
-        <div className="print-area bg-white text-black p-4 sm:p-5 rounded-xl font-mono text-[12px] leading-snug shadow-inner space-y-3 border border-gray-200">
+        <div ref={receiptRef} className="print-area bg-white text-black p-4 sm:p-5 rounded-xl font-mono text-[12px] leading-snug shadow-inner space-y-3 border border-gray-200">
           {/* Header */}
           <div className="text-center pb-2 border-b-2 border-dashed border-black space-y-1">
             <h1 className="font-extrabold text-base sm:text-lg uppercase tracking-wider text-black">{profile.shop_name}</h1>
@@ -198,7 +234,7 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
           <div className="text-center text-[10px] border-t border-dashed border-black pt-3 space-y-2 text-black">
             <p className="font-bold">{profile.receipt_footer_note || '*** THANK YOU FOR YOUR BUSINESS ***'}</p>
             <p className="text-[9px] text-gray-700">{profile.receipt_terms || '30-day warranty applies to replaced parts with this original receipt.'}</p>
-            
+
             {/* Barcode Visual */}
             <div className="pt-1 flex flex-col items-center justify-center">
               <div className="font-mono text-sm tracking-[0.25em] font-extrabold text-black selection:bg-none">
@@ -215,20 +251,35 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
         </div>
 
         {/* Action Controls (Screen Only) */}
-        <div className="no-print flex items-center gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
+        <div className="no-print flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
+            className="px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
           >
             Cancel
           </button>
+
+          <button
+            type="button"
+            onClick={handleShareOrDownloadImage}
+            disabled={isGeneratingImage}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-950 border border-emerald-800 hover:bg-emerald-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isGeneratingImage ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+            ) : (
+              <Image className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>Share Image</span>
+          </button>
+
           <button
             type="button"
             onClick={handlePrint}
-            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> Print Thermal Receipt
+            <Printer className="w-4 h-4" /> Print Receipt
           </button>
         </div>
       </div>
