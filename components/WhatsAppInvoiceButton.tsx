@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { FileText, Share2, Loader2, MessageSquare } from 'lucide-react';
+import React from 'react';
+import { Share2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Invoice } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
@@ -11,11 +11,7 @@ interface WhatsAppInvoiceButtonProps {
 }
 
 export default function WhatsAppInvoiceButton({ invoice }: WhatsAppInvoiceButtonProps) {
-  const [isSharing, setIsSharing] = useState(false);
-
-  const handleDirectNativeShare = async () => {
-    setIsSharing(true);
-
+  const handleDirectNativeShare = () => {
     try {
       const profile = getStoredProfile();
       const shopName = (profile.shop_name || 'FixMaster Repair Center').toUpperCase();
@@ -31,7 +27,7 @@ export default function WhatsAppInvoiceButton({ invoice }: WhatsAppInvoiceButton
       const currencyStr = profile.currency || 'LKR';
       const docNo = invoice.invoice_no;
 
-      // 1. Create PDF document synchronously using jsPDF
+      // 1. Create PDF document synchronously
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -170,12 +166,12 @@ export default function WhatsAppInvoiceButton({ invoice }: WhatsAppInvoiceButton
       doc.setFontSize(7.5);
       doc.text(profile.receipt_footer_note || '*** THANK YOU FOR YOUR BUSINESS ***', 40, y, { align: 'center' });
 
-      // Generate PDF File & URL
+      // Generate Blob & File
       const blob = doc.output('blob');
       const pdfFile = new File([blob], `FixMaster_Receipt_${docNo}.pdf`, { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(blob);
 
-      // 2. Trigger Mobile Phone Native Share Sheet
+      // 2. Synchronous Native Share Invocation inside exact user gesture stack frame
       if (typeof navigator !== 'undefined' && navigator.share) {
         let canSharePdf = false;
         try {
@@ -188,57 +184,43 @@ export default function WhatsAppInvoiceButton({ invoice }: WhatsAppInvoiceButton
 
         const shareData: ShareData = {
           title: `Receipt ${docNo}`,
-          text: `FixMaster Receipt ${docNo}`,
+          text: `FixMaster Receipt ${docNo} for ${invoice.customer_name}`,
         };
 
         if (canSharePdf) {
           shareData.files = [pdfFile];
-        } else {
-          shareData.url = blobUrl;
         }
 
         try {
-          await navigator.share(shareData);
+          navigator.share(shareData);
           return;
-        } catch (err: any) {
-          console.log('Direct share error:', err);
-          if (err.name === 'AbortError') return;
+        } catch (err) {
+          console.log('Native share call error:', err);
         }
       }
 
-      // 3. Fallback: Download PDF File & Open in New Tab
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `FixMaster_Receipt_${docNo}.pdf`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // 3. Fallback: Open PDF in browser window (triggers phone PDF share bar)
+      const win = window.open(blobUrl, '_blank');
+      if (!win) {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `FixMaster_Receipt_${docNo}.pdf`;
+        link.click();
+      }
     } catch (e) {
       console.error('Error sharing receipt:', e);
-    } finally {
-      setIsSharing(false);
     }
   };
 
   return (
     <button
+      type="button"
       onClick={handleDirectNativeShare}
-      disabled={isSharing}
-      className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/90 border border-amber-800 hover:bg-amber-900 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-      title="Open Phone Share Page (WhatsApp, Honor Share, Nearby Share, etc.)"
+      className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/90 border border-amber-800 hover:bg-amber-900 transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+      title="Open Phone Native Share Page"
     >
-      {isSharing ? (
-        <>
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-          <span>Opening Share...</span>
-        </>
-      ) : (
-        <>
-          <Share2 className="w-3.5 h-3.5 text-amber-400" />
-          <span>Share PDF</span>
-        </>
-      )}
+      <Share2 className="w-3.5 h-3.5 text-amber-400" />
+      <span>Share PDF</span>
     </button>
   );
 }

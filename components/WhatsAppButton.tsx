@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Share2, Loader2 } from 'lucide-react';
+import React from 'react';
+import { Share2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { JobCard } from '@/lib/types';
 import { getStoredProfile } from '@/lib/supabase';
@@ -11,11 +11,7 @@ interface WhatsAppButtonProps {
 }
 
 export default function WhatsAppButton({ job }: WhatsAppButtonProps) {
-  const [isSharing, setIsSharing] = useState(false);
-
-  const handleDirectNativeShare = async () => {
-    setIsSharing(true);
-
+  const handleDirectNativeShare = () => {
     try {
       const profile = getStoredProfile();
       const shopName = (profile.shop_name || 'FixMaster Repair Center').toUpperCase();
@@ -161,45 +157,36 @@ export default function WhatsAppButton({ job }: WhatsAppButtonProps) {
 
         if (canSharePdf) {
           shareData.files = [pdfFile];
-        } else {
-          shareData.url = blobUrl;
         }
 
         try {
-          await navigator.share(shareData);
+          navigator.share(shareData);
           return;
-        } catch (err: any) {
-          console.log('Direct share error:', err);
-          if (err.name === 'AbortError') return;
+        } catch (err) {
+          console.log('Native share call error:', err);
         }
       }
 
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `FixMaster_JobTicket_${docNo}.pdf`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const win = window.open(blobUrl, '_blank');
+      if (!win) {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `FixMaster_JobTicket_${docNo}.pdf`;
+        link.click();
+      }
     } catch (e) {
       console.error('Error sharing job ticket:', e);
-    } finally {
-      setIsSharing(false);
     }
   };
 
   return (
     <button
+      type="button"
       onClick={handleDirectNativeShare}
-      disabled={isSharing}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/90 border border-amber-800 hover:bg-amber-900 transition-all cursor-pointer disabled:opacity-50"
-      title="Open Phone Share Page"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/90 border border-amber-800 hover:bg-amber-900 transition-all cursor-pointer active:scale-95"
+      title="Open Phone Native Share Page"
     >
-      {isSharing ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-      ) : (
-        <Share2 className="w-3.5 h-3.5 text-amber-400" />
-      )}
+      <Share2 className="w-3.5 h-3.5 text-amber-400" />
       <span className="hidden sm:inline">Share</span>
     </button>
   );
