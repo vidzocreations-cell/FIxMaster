@@ -43,7 +43,7 @@ ${partsText}
 ----------------------------------
 *** THANK YOU FOR YOUR BUSINESS ***`;
 
-      // 1. Instant 0ms Native Mobile Share Sheet Call
+      // 1. Instant 0ms Native Mobile Share Sheet Call (Honor Share, Nearby Share, System Share)
       if (typeof navigator !== 'undefined' && navigator.share) {
         try {
           navigator.share({
@@ -57,19 +57,15 @@ ${partsText}
         }
       }
 
-      // 2. Direct Mobile WhatsApp Fallback if Web Share is disabled on device
+      // 2. Direct Official HTTPS WhatsApp Fallback (Prevents net::ERR_UNKNOWN_URL_SCHEMA in WebViews)
       let cleanPhone = invoice.phone_number.replace(/\D/g, '');
       if (cleanPhone.startsWith('0')) {
         cleanPhone = '94' + cleanPhone.substring(1);
       }
       const encodedMsg = encodeURIComponent(receiptSummaryText);
-      const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
 
-      if (isMobile) {
-        window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encodedMsg}`;
-      } else {
-        window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`, '_blank');
-      }
+      window.open(whatsappUrl, '_blank');
     } catch (e) {
       console.error('Instant share error:', e);
     }

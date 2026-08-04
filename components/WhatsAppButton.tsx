@@ -60,19 +60,15 @@ ${deposit > 0 ? `• Advance Deposit Paid: - ${currencyStr} ${deposit.toLocaleSt
         }
       }
 
-      // 2. Direct Mobile WhatsApp Fallback if Web Share is disabled on device
+      // 2. Direct Official HTTPS WhatsApp Fallback (Prevents net::ERR_UNKNOWN_URL_SCHEMA in WebViews)
       let cleanPhone = job.phone_number.replace(/\D/g, '');
       if (cleanPhone.startsWith('0')) {
         cleanPhone = '94' + cleanPhone.substring(1);
       }
       const encodedMsg = encodeURIComponent(ticketSummaryText);
-      const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
 
-      if (isMobile) {
-        window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encodedMsg}`;
-      } else {
-        window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`, '_blank');
-      }
+      window.open(whatsappUrl, '_blank');
     } catch (e) {
       console.error('Instant share error:', e);
     }
