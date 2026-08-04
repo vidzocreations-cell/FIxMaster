@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician } from '@/lib/types';
-import { getStoredJobs, saveStoredJobs, getStoredTechnicians } from '@/lib/supabase';
+import { getStoredJobs, saveStoredJobs, getStoredTechnicians, generateNextJobNo } from '@/lib/supabase';
 
 interface JobCardModalProps {
   isOpen: boolean;
@@ -190,7 +190,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       });
       saveStoredJobs(updated);
     } else {
-      const nextNum = 1001 + jobs.length;
+      const nextJobNo = generateNextJobNo(jobs);
       const newJobId = 'job-' + Date.now();
       let initialParts: JobPart[] = [];
 
@@ -216,7 +216,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
       const newJob: JobCard = {
         id: newJobId,
-        job_no: `JOB-${nextNum}`,
+        job_no: nextJobNo,
         customer_name: customerName,
         phone_number: phoneNumber,
         machine_category: machineCategory,

@@ -158,6 +158,42 @@ export function getStoredJobs(): JobCard[] {
   }
 }
 
+export function generateNextJobNo(existingJobs?: JobCard[]): string {
+  const stored = getStoredJobs();
+  const allJobs = existingJobs && existingJobs.length > 0 ? [...existingJobs, ...stored] : stored;
+  let maxNum = 1000;
+  for (const j of allJobs) {
+    if (j.job_no && j.job_no !== 'SYS-CONFIG-PROFILE') {
+      const match = j.job_no.match(/JOB-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+  return `JOB-${maxNum + 1}`;
+}
+
+export function generateNextInvoiceNo(existingInvoices?: Invoice[]): string {
+  const stored = getStoredInvoices();
+  const allInvoices = existingInvoices && existingInvoices.length > 0 ? [...existingInvoices, ...stored] : stored;
+  let maxNum = 1000;
+  for (const inv of allInvoices) {
+    if (inv.invoice_no) {
+      const match = inv.invoice_no.match(/INV-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+  return `INV-${maxNum + 1}`;
+}
+
 // Auto-creates an Invoice when a job status is updated to 'Delivered' / Paid
 export async function ensureInvoiceForDeliveredJob(job: JobCard) {
   if (job.status !== 'Delivered') return;
@@ -171,7 +207,7 @@ export async function ensureInvoiceForDeliveredJob(job: JobCard) {
     const subtotal = partsTotal + (job.labor_charge || 0);
     const advanceDeposit = job.advance_deposit || 0;
     const netPayable = Math.max(0, subtotal - advanceDeposit);
-    const nextInvNo = `INV-${1001 + existingInvoices.length}`;
+    const nextInvNo = generateNextInvoiceNo(existingInvoices);
 
     const newInvoice: Invoice = {
       id: 'inv-' + Date.now() + '-' + Math.floor(Math.random() * 1000),

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStoredJobs } from '@/lib/supabase';
+import { getStoredJobs, generateNextJobNo } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const jobs = getStoredJobs();
     const newJob = {
       id: 'job-' + Date.now(),
-      job_no: `JOB-${1001 + jobs.length}`,
+      job_no: generateNextJobNo(jobs),
       customer_name,
       phone_number,
       machine_category,

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw, Check, Clock } from 'lucide-react';
-import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud } from '@/lib/supabase';
+import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud, generateNextInvoiceNo } from '@/lib/supabase';
 import { JobCard, Invoice, PaymentMethod } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
@@ -58,7 +58,7 @@ export default function POSPage() {
   const handleCheckoutJob = async (jobToCheckout: JobCard) => {
     // 1. Create Invoice
     const invoices = getStoredInvoices();
-    const nextInvNo = `INV-${1001 + invoices.length}`;
+    const nextInvNo = generateNextInvoiceNo(invoices);
 
     const pTotal = jobToCheckout.parts ? jobToCheckout.parts.reduce((a, b) => a + b.total_price, 0) : 0;
     const lCharge = jobToCheckout.labor_charge || 0;

@@ -35,6 +35,13 @@ export default function JobsPage() {
     setIsCloudSyncing(false);
   };
 
+  const handleJobSaved = () => {
+    // Automatically reset status tab and date filter to 'All' so newly created job card is 100% visible!
+    setStatusTab('All');
+    setDatePreset('all');
+    loadJobs();
+  };
+
   useEffect(() => {
     loadJobs();
 
@@ -152,17 +159,20 @@ export default function JobsPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
               <Wrench className="w-6 h-6 text-cyan-400" /> Repair Job Cards Terminal
             </h1>
+            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+              Unlimited Storage ({jobs.length} Total Jobs)
+            </span>
             {isCloudSyncing && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center gap-1">
                 <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" /> Syncing Cloud...
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">Track equipment repairs, assign spare parts, update statuses & notify customers (Real-time Cloud Sync Active)</p>
+          <p className="text-xs text-slate-400">Unlimited Repair Job Cards - Track equipment repairs, assign spare parts & notify customers</p>
         </div>
 
         <button
@@ -170,7 +180,7 @@ export default function JobsPage() {
             setEditingJob(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer active:scale-95"
         >
           <Plus className="w-4 h-4" /> Create New Job Card
         </button>
@@ -209,12 +219,31 @@ export default function JobsPage() {
         </div>
       )}
 
+      {/* Counter Bar */}
+      <div className="flex items-center justify-between text-xs text-slate-400 font-semibold px-1">
+        <span>Displaying {filteredJobs.length} of {jobs.length} Unlimited Job Cards</span>
+        {(statusTab !== 'All' || categoryFilter !== 'All' || datePreset !== 'all' || searchQuery) && (
+          <button
+            onClick={handleResetFilters}
+            className="text-cyan-400 hover:underline cursor-pointer"
+          >
+            Show All Jobs
+          </button>
+        )}
+      </div>
+
       {/* Job Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredJobs.length === 0 ? (
           <div className="col-span-full glass-panel rounded-2xl border border-slate-800 p-12 text-center text-slate-500 italic space-y-2">
             <Wrench className="w-8 h-8 text-slate-600 mx-auto" />
             <p>No job cards found matching your date, category, or search filters.</p>
+            <button
+              onClick={handleResetFilters}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 inline-block cursor-pointer mt-2"
+            >
+              Clear All Filters
+            </button>
           </div>
         ) : (
           filteredJobs.map((job) => {
@@ -358,7 +387,7 @@ export default function JobsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         jobToEdit={editingJob}
-        onSaved={loadJobs}
+        onSaved={handleJobSaved}
       />
       <QRModal
         isOpen={!!qrJob}
