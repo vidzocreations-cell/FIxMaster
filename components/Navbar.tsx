@@ -45,15 +45,30 @@ export default function Navbar() {
 
   const handleSyncUpdates = async () => {
     setIsUpdating(true);
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.update();
+
+    try {
+      if (typeof window !== 'undefined') {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+        }
+
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const key of keys) {
+            await caches.delete(key);
+          }
+        }
       }
+    } catch (e) {
+      console.error('Error clearing cache:', e);
     }
+
     setTimeout(() => {
-      window.location.reload();
-    }, 600);
+      window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+    }, 400);
   };
 
   return (
@@ -98,8 +113,8 @@ export default function Navbar() {
         <button
           onClick={handleSyncUpdates}
           disabled={isUpdating}
-          className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950 transition-all cursor-pointer"
-          title="Sync Latest System Updates from Cloud"
+          className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950 transition-all cursor-pointer active:scale-95"
+          title="Sync Latest System Updates & Clear Mobile Cache"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
           <span className="text-[11px] sm:text-xs">{isUpdating ? 'Syncing...' : 'Sync Update'}</span>
