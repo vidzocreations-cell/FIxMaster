@@ -14,6 +14,18 @@ interface ReceiptImageShareModalProps {
   jobCard?: JobCard | null;
 }
 
+function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
 export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCard }: ReceiptImageShareModalProps) {
   const [mounted, setMounted] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -182,8 +194,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
       document.body.removeChild(container);
 
       const dataUrl = canvas.toDataURL('image/png');
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `${docNo}_receipt.png`, { type: 'image/png' });
+      const file = dataURLtoFile(dataUrl, `${docNo}_receipt.png`);
 
       setImageUri(dataUrl);
       setImageFile(file);
@@ -197,63 +208,57 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
   const handleDownload = () => {
     if (!imageUri) return;
     try {
-      fetch(imageUri)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${docNo}_receipt.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          setStatusNotice('✓ Receipt Photo saved to Gallery / Downloads!');
-        });
-    } catch {
       const link = document.createElement('a');
       link.href = imageUri;
       link.download = `${docNo}_receipt.png`;
+      link.target = '_blank';
+      document.body.appendChild(link);
       link.click();
-      setStatusNotice('✓ Receipt Photo downloaded!');
+      document.body.removeChild(link);
+      setStatusNotice('✓ Saved Receipt Photo to Phone Gallery / Downloads!');
+    } catch {
+      setStatusNotice('✓ Downloaded Receipt Photo!');
     }
   };
 
   const handleNativeShare = async () => {
     setStatusNotice('');
 
-    if (imageFile && typeof navigator !== 'undefined' && navigator.share) {
-      // 1. Try file sharing native Web Share API
-      try {
-        await navigator.share({
-          files: [imageFile],
-          title: `FixMaster Receipt ${docNo}`,
-          text: `FixMaster Receipt Photo ${docNo}`,
-        });
-        setStatusNotice('✓ Opened System App Share Sheet!');
-        return;
-      } catch (err: any) {
-        console.log('File share error:', err);
-        if (err.name === 'AbortError') return; // User intentionally cancelled share dialog
-      }
+    if (imageUri) {
+      const fileToShare = imageFile || dataURLtoFile(imageUri, `${docNo}_receipt.png`);
 
-      // 2. Try text/url native share if files sharing was denied
-      try {
-        await navigator.share({
-          title: `FixMaster Receipt ${docNo}`,
-          text: `FixMaster Sales Receipt ${docNo}`,
-        });
-        setStatusNotice('✓ Opened System App Share Sheet!');
-        return;
-      } catch (err: any) {
-        console.log('Text share error:', err);
-        if (err.name === 'AbortError') return;
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        // 1. Synchronously trigger native file share sheet
+        try {
+          await navigator.share({
+            files: [fileToShare],
+            title: `Receipt ${docNo}`,
+            text: `FixMaster Receipt ${docNo}`,
+          });
+          setStatusNotice('✓ Opened Mobile App Share Menu!');
+          return;
+        } catch (err: any) {
+          console.log('Native file share error:', err);
+          if (err.name === 'AbortError') return; // User closed share sheet intentionally
+        }
+
+        // 2. Fallback text share if file share threw error
+        try {
+          await navigator.share({
+            title: `Receipt ${docNo}`,
+            text: `FixMaster Receipt ${docNo}`,
+          });
+          setStatusNotice('✓ Opened Mobile App Share Menu!');
+          return;
+        } catch (err: any) {
+          console.log('Text share error:', err);
+          if (err.name === 'AbortError') return;
+        }
       }
     }
 
-    // 3. Fallback if Web Share API is unhandled/blocked on device: download & launch WhatsApp!
+    // 3. Fallback: Save photo directly
     handleDownload();
-    handleDirectWhatsApp();
   };
 
   const handleDirectWhatsApp = () => {
@@ -266,7 +271,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
     const profile = getStoredProfile();
     const shopName = profile.shop_name || 'FixMaster Repair Center';
 
-    // Auto-save photo to device
+    // Save photo
     handleDownload();
 
     const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -282,7 +287,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
       window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${msgText}`, '_blank');
     }
 
-    setStatusNotice('✓ Opening WhatsApp & Saved Photo!');
+    setStatusNotice('✓ Saved Photo & Opening WhatsApp!');
   };
 
   if (!isOpen || !mounted) return null;
@@ -294,7 +299,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share</h2>
+            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share Options</h2>
           </div>
           <button
             type="button"
@@ -305,7 +310,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
           </button>
         </div>
 
-        {/* Notice Banner */}
+        {/* Status Notice Banner */}
         {statusNotice && (
           <div className="p-2.5 rounded-xl bg-emerald-950/90 border border-emerald-800 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
             <Check className="w-4 h-4 text-emerald-400" />
@@ -327,33 +332,34 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
                 alt="Receipt Preview"
                 className="max-h-[320px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
               />
+              <p className="text-[11px] text-slate-400">Receipt photo ready! Tap orange button to open phone share menu</p>
             </div>
           ) : (
             <p className="text-xs text-red-400">Failed to render receipt image.</p>
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Controls Grid */}
         <div className="space-y-2 pt-1">
-          {/* WhatsApp Direct App Open */}
+          {/* Main Mobile Native Share Sheet Button (Honor / MIUI / Android / iOS share page) */}
           <button
             type="button"
-            onClick={handleDirectWhatsApp}
+            onClick={handleNativeShare}
             disabled={!imageUri || isGenerating}
-            className="w-full py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <MessageSquare className="w-4 h-4 text-white" /> Open WhatsApp App & Attach Photo
+            <Share2 className="w-4.5 h-4.5 text-slate-950" /> Mobile App Options (Open Phone Share Page)
           </button>
 
           <div className="grid grid-cols-2 gap-2">
-            {/* Mobile Native App Share Sheet */}
+            {/* Direct WhatsApp App Launcher */}
             <button
               type="button"
-              onClick={handleNativeShare}
+              onClick={handleDirectWhatsApp}
               disabled={!imageUri || isGenerating}
-              className="py-2.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-950 border border-amber-800/80 hover:bg-amber-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-950 border border-emerald-800/80 hover:bg-emerald-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Share2 className="w-3.5 h-3.5 text-amber-400" /> System Share Menu
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp Direct
             </button>
 
             {/* Save Photo */}
