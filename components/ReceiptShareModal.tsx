@@ -90,32 +90,7 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
     }
   };
 
-  // Action 2: Direct Android Intent / WhatsApp App Launcher (Bypasses "Open app" intermediate page!)
-  const handleOpenWhatsAppDirect = () => {
-    let cleanPhone = customerPhone.replace(/\D/g, '');
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '94' + cleanPhone.substring(1);
-    }
-    const encodedMsg = encodeURIComponent(formattedBillText);
-
-    // Auto-copy text first
-    handleCopyText();
-
-    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    const isAndroid = /Android/i.test(userAgent);
-
-    if (isAndroid) {
-      // Android OS Intent: Directly launches com.whatsapp package without web browser page!
-      window.location.href = `intent://send?phone=${cleanPhone}&text=${encodedMsg}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
-    } else {
-      // iOS / Desktop Web fallback
-      window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`, '_blank');
-    }
-
-    setStatusNotice('✓ Opening Native WhatsApp Mobile App!');
-  };
-
-  // Action 3: System Native Share Sheet
+  // Action 2: System Native Share Sheet
   const handleSystemShare = async () => {
     setStatusNotice('');
 
@@ -133,10 +108,17 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
       }
     }
 
-    // Fallback: Copy to Clipboard & Open WhatsApp
+    // Fallback: Copy to Clipboard
     handleCopyText();
-    handleOpenWhatsAppDirect();
   };
+
+  let cleanPhone = customerPhone.replace(/\D/g, '');
+  if (cleanPhone.startsWith('0')) {
+    cleanPhone = '94' + cleanPhone.substring(1);
+  }
+  const encodedMsg = encodeURIComponent(formattedBillText);
+  const whatsappApiUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+  const whatsappWaUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
 
   const modalContent = (
     <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-4 sm:p-6 flex items-center justify-center min-h-screen">
@@ -181,16 +163,18 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
           </pre>
         </div>
 
-        {/* Action Controls Grid */}
+        {/* Action Controls Grid (Hyperlink & Copy Buttons) */}
         <div className="space-y-2 pt-1">
-          {/* Method 1: Direct Android Intent WhatsApp Launcher */}
-          <button
-            type="button"
-            onClick={handleOpenWhatsAppDirect}
-            className="w-full py-3.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+          {/* Method 1: HTML Hyperlink WhatsApp Link Button */}
+          <a
+            href={whatsappApiUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleCopyText}
+            className="w-full py-3.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all active:scale-95 text-center cursor-pointer"
           >
             <MessageSquare className="w-4 h-4 text-white" /> Open WhatsApp App Directly
-          </button>
+          </a>
 
           <div className="grid grid-cols-2 gap-2">
             {/* Method 2: System Phone Share Menu */}
@@ -212,6 +196,17 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
               <span>{copiedText ? 'Text Copied' : 'Copy Bill Text'}</span>
             </button>
           </div>
+
+          {/* Optional Direct wa.me Hyperlink Fallback */}
+          <a
+            href={whatsappWaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleCopyText}
+            className="w-full py-2 rounded-xl text-[11px] font-semibold text-slate-400 bg-slate-900 hover:text-white border border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer mt-1"
+          >
+            <ExternalLink className="w-3 h-3 text-emerald-400" /> WhatsApp Link (Alternative)
+          </a>
 
           {/* Optional Print View Button */}
           {onOpenPrint && (
