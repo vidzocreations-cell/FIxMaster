@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Download, Image as ImageIcon, Loader2, MessageSquare, Check, ExternalLink } from 'lucide-react';
+import { X, Share2, Download, Image as ImageIcon, Loader2, MessageSquare, Check } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
@@ -19,7 +19,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [shareSuccessMessage, setShareSuccessMessage] = useState('');
+  const [statusNotice, setStatusNotice] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -27,13 +27,15 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
 
   useEffect(() => {
     if (isOpen) {
-      setShareSuccessMessage('');
+      setStatusNotice('');
       generateImage();
     } else {
       setImageUri(null);
       setImageFile(null);
     }
   }, [isOpen, invoice, jobCard]);
+
+  const docNo = invoice ? invoice.invoice_no : jobCard?.job_no || 'RECEIPT';
 
   const generateImage = async () => {
     setIsGenerating(true);
@@ -49,7 +51,6 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
         targetJob = allJobs.find((j) => j.id === invoice.job_card_id || j.customer_name === invoice.customer_name);
       }
 
-      const docNo = invoice ? invoice.invoice_no : targetJob?.job_no || 'RECEIPT-1001';
       const createdDate = invoice ? new Date(invoice.created_at) : targetJob ? new Date(targetJob.created_at) : new Date();
       const parts = targetJob?.parts || [];
       const labor = targetJob?.labor_charge || 0;
@@ -193,41 +194,66 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
     }
   };
 
-  const handleSystemShare = async () => {
-    if (!imageFile) return;
+  const handleDownload = () => {
+    if (!imageUri) return;
+    try {
+      fetch(imageUri)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${docNo}_receipt.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          setStatusNotice('✓ Receipt Photo saved to Gallery / Downloads!');
+        });
+    } catch {
+      const link = document.createElement('a');
+      link.href = imageUri;
+      link.download = `${docNo}_receipt.png`;
+      link.click();
+      setStatusNotice('✓ Receipt Photo downloaded!');
+    }
+  };
 
-    // 1. Try file sharing native Web Share API
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
-          await navigator.share({
-            files: [imageFile],
-            title: 'FixMaster Receipt Image',
-            text: 'Here is your FixMaster repair/sales receipt image.',
-          });
-          setShareSuccessMessage('Opened System Share Sheet!');
-          return;
-        }
-      } catch (err) {
-        console.log('File share error/cancelled:', err);
-      }
+  const handleNativeShare = async () => {
+    setStatusNotice('');
 
-      // 2. Try text/url native share
+    if (imageFile && typeof navigator !== 'undefined' && navigator.share) {
+      // 1. Try file sharing native Web Share API
       try {
         await navigator.share({
-          title: 'FixMaster Receipt',
-          text: `FixMaster Receipt ${invoice ? invoice.invoice_no : jobCard?.job_no || ''}`,
+          files: [imageFile],
+          title: `FixMaster Receipt ${docNo}`,
+          text: `FixMaster Receipt Photo ${docNo}`,
         });
-        setShareSuccessMessage('Opened System Share Sheet!');
+        setStatusNotice('✓ Opened System App Share Sheet!');
         return;
-      } catch (err) {
-        console.log('Text share error/cancelled:', err);
+      } catch (err: any) {
+        console.log('File share error:', err);
+        if (err.name === 'AbortError') return; // User intentionally cancelled share dialog
+      }
+
+      // 2. Try text/url native share if files sharing was denied
+      try {
+        await navigator.share({
+          title: `FixMaster Receipt ${docNo}`,
+          text: `FixMaster Sales Receipt ${docNo}`,
+        });
+        setStatusNotice('✓ Opened System App Share Sheet!');
+        return;
+      } catch (err: any) {
+        console.log('Text share error:', err);
+        if (err.name === 'AbortError') return;
       }
     }
 
-    // 3. Fallback: Download image directly
+    // 3. Fallback if Web Share API is unhandled/blocked on device: download & launch WhatsApp!
     handleDownload();
-    setShareSuccessMessage('Downloaded Photo to Phone Gallery / Files!');
+    handleDirectWhatsApp();
   };
 
   const handleDirectWhatsApp = () => {
@@ -239,9 +265,8 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
 
     const profile = getStoredProfile();
     const shopName = profile.shop_name || 'FixMaster Repair Center';
-    const docNo = invoice ? invoice.invoice_no : jobCard?.job_no || 'RECEIPT';
 
-    // Automatically trigger photo download so user has the photo saved
+    // Auto-save photo to device
     handleDownload();
 
     const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -257,16 +282,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
       window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${msgText}`, '_blank');
     }
 
-    setShareSuccessMessage('Opening WhatsApp & Saved Photo to Phone!');
-  };
-
-  const handleDownload = () => {
-    if (!imageUri) return;
-    const docNo = invoice ? invoice.invoice_no : jobCard?.job_no || 'RECEIPT';
-    const link = document.createElement('a');
-    link.href = imageUri;
-    link.download = `${docNo}_receipt.png`;
-    link.click();
+    setStatusNotice('✓ Opening WhatsApp & Saved Photo!');
   };
 
   if (!isOpen || !mounted) return null;
@@ -278,7 +294,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share Options</h2>
+            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share</h2>
           </div>
           <button
             type="button"
@@ -289,38 +305,37 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
           </button>
         </div>
 
-        {/* Status Notification Banner */}
-        {shareSuccessMessage && (
+        {/* Notice Banner */}
+        {statusNotice && (
           <div className="p-2.5 rounded-xl bg-emerald-950/90 border border-emerald-800 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
             <Check className="w-4 h-4 text-emerald-400" />
-            <span>{shareSuccessMessage}</span>
+            <span>{statusNotice}</span>
           </div>
         )}
 
         {/* Image Preview Box */}
-        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[280px] overflow-hidden">
+        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[260px] overflow-hidden">
           {isGenerating ? (
             <div className="flex flex-col items-center gap-2 py-12 text-slate-400 text-xs">
               <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
-              <span>Generating Receipt Image Preview...</span>
+              <span>Generating Receipt Photo Preview...</span>
             </div>
           ) : imageUri ? (
             <div className="space-y-2 text-center w-full">
               <img
                 src={imageUri}
                 alt="Receipt Preview"
-                className="max-h-[340px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
+                className="max-h-[320px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
               />
-              <p className="text-[11px] text-slate-400">Receipt Photo generated! Choose your mobile action below:</p>
             </div>
           ) : (
             <p className="text-xs text-red-400">Failed to render receipt image.</p>
           )}
         </div>
 
-        {/* Action Controls Grid */}
+        {/* Action Buttons */}
         <div className="space-y-2 pt-1">
-          {/* Direct WhatsApp Share Action */}
+          {/* WhatsApp Direct App Open */}
           <button
             type="button"
             onClick={handleDirectWhatsApp}
@@ -334,7 +349,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
             {/* Mobile Native App Share Sheet */}
             <button
               type="button"
-              onClick={handleSystemShare}
+              onClick={handleNativeShare}
               disabled={!imageUri || isGenerating}
               className="py-2.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-950 border border-amber-800/80 hover:bg-amber-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
@@ -346,7 +361,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
               type="button"
               onClick={handleDownload}
               disabled={!imageUri || isGenerating}
-              className="py-2.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800/80 hover:bg-cyan-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5 text-cyan-400" /> Save Photo
             </button>
