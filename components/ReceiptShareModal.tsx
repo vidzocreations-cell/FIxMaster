@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Copy, Check, MessageSquare, Share2, Printer, FileText, Smartphone, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, MessageSquare, Share2, Printer, ExternalLink } from 'lucide-react';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
 
@@ -90,20 +90,29 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
     }
   };
 
-  // Action 2: WhatsApp Direct Launch via official API
-  const handleOpenWhatsApp = () => {
+  // Action 2: Direct Android Intent / WhatsApp App Launcher (Bypasses "Open app" intermediate page!)
+  const handleOpenWhatsAppDirect = () => {
     let cleanPhone = customerPhone.replace(/\D/g, '');
     if (cleanPhone.startsWith('0')) {
       cleanPhone = '94' + cleanPhone.substring(1);
     }
     const encodedMsg = encodeURIComponent(formattedBillText);
-    const whatsappApiUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
 
-    // Also auto-copy text just in case user wants to paste elsewhere
+    // Auto-copy text first
     handleCopyText();
 
-    window.open(whatsappApiUrl, '_blank');
-    setStatusNotice('✓ Opening WhatsApp with Receipt Text!');
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isAndroid = /Android/i.test(userAgent);
+
+    if (isAndroid) {
+      // Android OS Intent: Directly launches com.whatsapp package without web browser page!
+      window.location.href = `intent://send?phone=${cleanPhone}&text=${encodedMsg}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+    } else {
+      // iOS / Desktop Web fallback
+      window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`, '_blank');
+    }
+
+    setStatusNotice('✓ Opening Native WhatsApp Mobile App!');
   };
 
   // Action 3: System Native Share Sheet
@@ -126,7 +135,7 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
 
     // Fallback: Copy to Clipboard & Open WhatsApp
     handleCopyText();
-    handleOpenWhatsApp();
+    handleOpenWhatsAppDirect();
   };
 
   const modalContent = (
@@ -172,15 +181,15 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
           </pre>
         </div>
 
-        {/* 3-Way Failproof Sharing Actions */}
+        {/* Action Controls Grid */}
         <div className="space-y-2 pt-1">
-          {/* Method 1: WhatsApp Direct */}
+          {/* Method 1: Direct Android Intent WhatsApp Launcher */}
           <button
             type="button"
-            onClick={handleOpenWhatsApp}
-            className="w-full py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+            onClick={handleOpenWhatsAppDirect}
+            className="w-full py-3.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
           >
-            <MessageSquare className="w-4 h-4 text-white" /> Send directly via WhatsApp
+            <MessageSquare className="w-4 h-4 text-white" /> Open WhatsApp App Directly
           </button>
 
           <div className="grid grid-cols-2 gap-2">
@@ -193,7 +202,7 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
               <Share2 className="w-3.5 h-3.5 text-amber-400" /> Phone Share Menu
             </button>
 
-            {/* Method 3: Copy Text */}
+            {/* Method 3: Copy Bill Text */}
             <button
               type="button"
               onClick={handleCopyText}
@@ -204,7 +213,7 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
             </button>
           </div>
 
-          {/* Optional Print Button */}
+          {/* Optional Print View Button */}
           {onOpenPrint && (
             <button
               type="button"
