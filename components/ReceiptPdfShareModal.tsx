@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Download, FileText, Loader2, Check } from 'lucide-react';
+import { X, Share2, Download, FileText, Loader2, Check, MessageSquare, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
@@ -60,7 +60,7 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
       const netPayable = invoice ? invoice.net_payable : Math.max(0, subtotal - deposit - discount);
       const currencyStr = profile.currency || 'LKR';
 
-      // Create 80mm standard thermal roll PDF in jsPDF (80mm x 180mm)
+      // Create 80mm standard thermal roll PDF in jsPDF (80mm x 190mm)
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -246,6 +246,41 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
     setStatusNotice('✓ Saved PDF Receipt to Downloads!');
   };
 
+  const handleOpenPdfViewer = () => {
+    if (!pdfBlobUrl) return;
+    window.open(pdfBlobUrl, '_blank');
+    setStatusNotice('✓ Opened PDF Document Viewer!');
+  };
+
+  const handleDirectWhatsApp = () => {
+    const rawPhone = invoice?.phone_number || jobCard?.phone_number || '';
+    let cleanPhone = rawPhone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '94' + cleanPhone.substring(1);
+    }
+
+    const profile = getStoredProfile();
+    const shopName = profile.shop_name || 'FixMaster Repair Center';
+
+    // Download PDF to phone
+    handleDownload();
+
+    const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const msgText = encodeURIComponent(
+      `🧾 *${shopName}*\n` +
+      `Receipt *${docNo}*\n\n` +
+      `📄 (Saved PDF Receipt to your device - attach to chat!)`
+    );
+
+    if (isMobile) {
+      window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${msgText}`;
+    } else {
+      window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${msgText}`, '_blank');
+    }
+
+    setStatusNotice('✓ Saved PDF & Opening WhatsApp!');
+  };
+
   const handleNativeShare = async () => {
     setStatusNotice('');
 
@@ -278,8 +313,8 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
       }
     }
 
-    // Fallback if Web Share API fails: download PDF file
-    handleDownload();
+    // Fallback if native share fails on phone: open PDF directly in viewer tab
+    handleOpenPdfViewer();
   };
 
   if (!isOpen || !mounted) return null;
@@ -291,7 +326,7 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-sm sm:text-base font-bold text-white">PDF Receipt Share & Download</h2>
+            <h2 className="text-sm sm:text-base font-bold text-white">PDF Receipt Share & Options</h2>
           </div>
           <button
             type="button"
@@ -311,7 +346,7 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
         )}
 
         {/* PDF Preview Card */}
-        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[220px] text-center space-y-3">
+        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[200px] text-center space-y-3">
           {isGenerating ? (
             <div className="flex flex-col items-center gap-2 py-8 text-slate-400 text-xs">
               <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
@@ -319,12 +354,18 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
             </div>
           ) : pdfBlobUrl ? (
             <>
-              <div className="w-16 h-16 rounded-2xl bg-cyan-950 border border-cyan-800 flex items-center justify-center shadow-lg text-cyan-400">
-                <FileText className="w-8 h-8" />
+              <div className="w-14 h-14 rounded-2xl bg-cyan-950 border border-cyan-800 flex items-center justify-center shadow-lg text-cyan-400">
+                <FileText className="w-7 h-7" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">FixMaster_Receipt_{docNo}.pdf</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Vector PDF Thermal Bill Format</p>
+                <button
+                  type="button"
+                  onClick={handleOpenPdfViewer}
+                  className="text-xs text-cyan-400 hover:underline inline-flex items-center gap-1 mt-1 font-semibold"
+                >
+                  <ExternalLink className="w-3 h-3" /> View Full PDF Document
+                </button>
               </div>
             </>
           ) : (
@@ -332,27 +373,39 @@ export default function ReceiptPdfShareModal({ isOpen, onClose, invoice, jobCard
           )}
         </div>
 
-        {/* Action Controls Grid (Save PDF & Mobile Share Option) */}
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          {/* Save PDF */}
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={!pdfBlobUrl || isGenerating}
-            className="py-3.5 rounded-xl text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <Download className="w-4 h-4 text-cyan-400" /> Download PDF
-          </button>
-
+        {/* Action Controls Grid */}
+        <div className="space-y-2 pt-1">
           {/* Main Mobile Native Share Sheet Button */}
           <button
             type="button"
             onClick={handleNativeShare}
             disabled={!pdfBlobUrl || isGenerating}
-            className="py-3.5 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <Share2 className="w-4 h-4 text-slate-950" /> Mobile Share Option
+            <Share2 className="w-4.5 h-4.5 text-slate-950" /> Mobile Share Option (Phone Apps Menu)
           </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            {/* Direct WhatsApp App Launcher */}
+            <button
+              type="button"
+              onClick={handleDirectWhatsApp}
+              disabled={!pdfBlobUrl || isGenerating}
+              className="py-2.5 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-950 border border-emerald-800/80 hover:bg-emerald-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp Direct
+            </button>
+
+            {/* Save PDF */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!pdfBlobUrl || isGenerating}
+              className="py-2.5 rounded-xl text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800/80 hover:bg-cyan-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5 text-cyan-400" /> Save PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
