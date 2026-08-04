@@ -224,40 +224,41 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
   const handleNativeShare = async () => {
     setStatusNotice('');
 
-    if (imageUri) {
-      const fileToShare = imageFile || dataURLtoFile(imageUri, `${docNo}_receipt.png`);
+    if (!imageUri) return;
 
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        // 1. Synchronously trigger native file share sheet
-        try {
-          await navigator.share({
-            files: [fileToShare],
-            title: `Receipt ${docNo}`,
-            text: `FixMaster Receipt ${docNo}`,
-          });
-          setStatusNotice('✓ Opened Mobile App Share Menu!');
-          return;
-        } catch (err: any) {
-          console.log('Native file share error:', err);
-          if (err.name === 'AbortError') return; // User closed share sheet intentionally
-        }
+    const fileToShare = imageFile || dataURLtoFile(imageUri, `${docNo}_receipt.png`);
 
-        // 2. Fallback text share if file share threw error
-        try {
-          await navigator.share({
-            title: `Receipt ${docNo}`,
-            text: `FixMaster Receipt ${docNo}`,
-          });
-          setStatusNotice('✓ Opened Mobile App Share Menu!');
-          return;
-        } catch (err: any) {
-          console.log('Text share error:', err);
-          if (err.name === 'AbortError') return;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      const shareData: ShareData = {
+        title: `FixMaster Receipt ${docNo}`,
+        text: `FixMaster Sales Receipt ${docNo}`,
+      };
+
+      // Safely test if browser supports file sharing before invoking navigator.share
+      let canShareFile = false;
+      try {
+        if (navigator.canShare && fileToShare) {
+          canShareFile = navigator.canShare({ files: [fileToShare] });
         }
+      } catch {
+        canShareFile = false;
+      }
+
+      if (canShareFile) {
+        shareData.files = [fileToShare];
+      }
+
+      try {
+        await navigator.share(shareData);
+        setStatusNotice('✓ Opened Mobile App Share Menu!');
+        return;
+      } catch (err: any) {
+        console.log('Native share error:', err);
+        if (err.name === 'AbortError') return; // User closed share sheet intentionally
       }
     }
 
-    // 3. Fallback: Save photo directly
+    // Fallback if Web Share API fails or is unsupported: download photo directly
     handleDownload();
   };
 
@@ -309,7 +310,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
           )}
         </div>
 
-        {/* Action Controls Grid (Only 2 Clean Buttons: Save Photo & Mobile Share Option) */}
+        {/* Action Controls Grid (Save Photo & Mobile Share Option) */}
         <div className="grid grid-cols-2 gap-3 pt-1">
           {/* Save Photo */}
           <button
