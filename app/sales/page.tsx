@@ -6,6 +6,7 @@ import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice,
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 import InvoiceEditModal from '@/components/InvoiceEditModal';
+import WhatsAppInvoiceButton from '@/components/WhatsAppInvoiceButton';
 
 export type SalesDatePreset = 'all' | 'today' | 'week' | 'month' | 'custom';
 
@@ -113,7 +114,7 @@ export default function SalesHistoryPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">View past sales transactions, filter by date range, edit receipt details & reprint receipts (Real-time Cloud Sync Active)</p>
+          <p className="text-xs text-slate-400">View past sales transactions, filter by date range, edit receipt details, reprint & share receipts via WhatsApp</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -254,12 +255,19 @@ export default function SalesHistoryPage() {
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
+
+                        {/* Reprint Button */}
                         <button
                           onClick={() => setSelectedInvoice(inv)}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
                         >
                           <Printer className="w-3.5 h-3.5 text-cyan-400" /> Reprint
                         </button>
+
+                        {/* WhatsApp Invoice Receipt Sharing Button */}
+                        <WhatsAppInvoiceButton invoice={inv} />
+
+                        {/* Delete Invoice Button */}
                         <button
                           onClick={() => handleDeleteInvoice(inv.id, inv.invoice_no)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
