@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Search, Calendar, Filter, RotateCcw, Wrench, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Calendar, Filter, RotateCcw, Wrench, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobStatus } from '@/lib/types';
 
 export type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom';
@@ -46,6 +46,8 @@ export default function JobCardFilterBar({
   counts,
   onResetFilters,
 }: JobCardFilterBarProps) {
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+
   const tabs = [
     { key: 'All', label: 'All Jobs', count: counts.all, color: 'bg-slate-700 text-slate-200' },
     { key: 'Pending', label: 'Pending', count: counts.pending, color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
@@ -57,8 +59,39 @@ export default function JobCardFilterBar({
 
   return (
     <div className="space-y-4 glass-panel p-4 rounded-2xl border border-slate-800">
-      {/* 1. Status Tabs Bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      {/* 1. Mobile Status Category Selector Dropdown (Hidden on Desktop) */}
+      <div className="md:hidden space-y-2 border-b border-slate-800/80 pb-3">
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+            Job Status Filter Category:
+          </label>
+          <button
+            onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+            className="text-xs font-bold text-slate-300 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer"
+          >
+            <Filter className="w-3.5 h-3.5 text-cyan-400" />
+            <span>More Filters</span>
+            {isMobileFiltersOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Compact Mobile Dropdown for Status Category */}
+        <select
+          value={statusTab}
+          onChange={(e) => setStatusTab(e.target.value)}
+          className="w-full bg-slate-900 border border-cyan-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400 cursor-pointer shadow-md"
+        >
+          <option value="All">📋 All Jobs ({counts.all})</option>
+          <option value="Pending">⏳ Pending ({counts.pending})</option>
+          <option value="In Progress">⚡ In Progress ({counts.inProgress})</option>
+          <option value="Completed">✅ Completed ({counts.completed})</option>
+          <option value="OverduePickup">⚠️ Overdue Unpaid ({counts.overduePickup})</option>
+          <option value="Delivered">📦 Delivered / Paid ({counts.delivered})</option>
+        </select>
+      </div>
+
+      {/* 2. Desktop Status Tabs Bar (Hidden on Mobile) */}
+      <div className="hidden md:flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         {tabs.map((tab) => {
           const isActive = statusTab === tab.key;
           return (
@@ -82,8 +115,8 @@ export default function JobCardFilterBar({
         })}
       </div>
 
-      {/* 2. Filter Controls Row */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+      {/* 3. Filter Controls Row (Always visible on desktop, collapsible on mobile) */}
+      <div className={`grid grid-cols-1 md:grid-cols-12 gap-3 ${isMobileFiltersOpen ? 'block' : 'hidden md:grid'}`}>
         {/* Search Bar */}
         <div className="md:col-span-4 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
