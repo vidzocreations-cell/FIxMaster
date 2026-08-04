@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Share2, Download, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Share2, Download, Image as ImageIcon, Loader2, MessageSquare, Check, ExternalLink } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { Invoice, JobCard, BusinessProfile } from '@/lib/types';
 import { getStoredProfile, getStoredJobs } from '@/lib/supabase';
@@ -19,6 +19,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [shareSuccessMessage, setShareSuccessMessage] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -26,6 +27,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
 
   useEffect(() => {
     if (isOpen) {
+      setShareSuccessMessage('');
       generateImage();
     } else {
       setImageUri(null);
@@ -191,23 +193,71 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
     }
   };
 
-  const handleNativeShare = async () => {
+  const handleSystemShare = async () => {
     if (!imageFile) return;
 
-    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+    // 1. Try file sharing native Web Share API
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+          await navigator.share({
+            files: [imageFile],
+            title: 'FixMaster Receipt Image',
+            text: 'Here is your FixMaster repair/sales receipt image.',
+          });
+          setShareSuccessMessage('Opened System Share Sheet!');
+          return;
+        }
+      } catch (err) {
+        console.log('File share error/cancelled:', err);
+      }
+
+      // 2. Try text/url native share
       try {
         await navigator.share({
-          files: [imageFile],
-          title: 'Receipt Image',
-          text: 'FixMaster Sales Receipt Image',
+          title: 'FixMaster Receipt',
+          text: `FixMaster Receipt ${invoice ? invoice.invoice_no : jobCard?.job_no || ''}`,
         });
+        setShareSuccessMessage('Opened System Share Sheet!');
+        return;
       } catch (err) {
-        console.log('Share dismissed or failed:', err);
+        console.log('Text share error/cancelled:', err);
       }
-    } else {
-      // Fallback download if mobile share is unavailable
-      handleDownload();
     }
+
+    // 3. Fallback: Download image directly
+    handleDownload();
+    setShareSuccessMessage('Downloaded Photo to Phone Gallery / Files!');
+  };
+
+  const handleDirectWhatsApp = () => {
+    const rawPhone = invoice?.phone_number || jobCard?.phone_number || '';
+    let cleanPhone = rawPhone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '94' + cleanPhone.substring(1);
+    }
+
+    const profile = getStoredProfile();
+    const shopName = profile.shop_name || 'FixMaster Repair Center';
+    const docNo = invoice ? invoice.invoice_no : jobCard?.job_no || 'RECEIPT';
+
+    // Automatically trigger photo download so user has the photo saved
+    handleDownload();
+
+    const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const msgText = encodeURIComponent(
+      `🧾 *${shopName}*\n` +
+      `Receipt *${docNo}*\n\n` +
+      `🖼️ (Saved receipt photo to your device - attach to chat!)`
+    );
+
+    if (isMobile) {
+      window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${msgText}`;
+    } else {
+      window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${msgText}`, '_blank');
+    }
+
+    setShareSuccessMessage('Opening WhatsApp & Saved Photo to Phone!');
   };
 
   const handleDownload = () => {
@@ -228,7 +278,7 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo Preview</h2>
+            <h2 className="text-sm sm:text-base font-bold text-white">Receipt Photo & Mobile Share Options</h2>
           </div>
           <button
             type="button"
@@ -239,8 +289,16 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
           </button>
         </div>
 
+        {/* Status Notification Banner */}
+        {shareSuccessMessage && (
+          <div className="p-2.5 rounded-xl bg-emerald-950/90 border border-emerald-800 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>{shareSuccessMessage}</span>
+          </div>
+        )}
+
         {/* Image Preview Box */}
-        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[300px] overflow-hidden">
+        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[280px] overflow-hidden">
           {isGenerating ? (
             <div className="flex flex-col items-center gap-2 py-12 text-slate-400 text-xs">
               <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
@@ -251,34 +309,48 @@ export default function ReceiptImageShareModal({ isOpen, onClose, invoice, jobCa
               <img
                 src={imageUri}
                 alt="Receipt Preview"
-                className="max-h-[380px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
+                className="max-h-[340px] w-auto mx-auto rounded-lg shadow-xl border border-gray-200 object-contain bg-white"
               />
-              <p className="text-[11px] text-slate-400">Select any app (WhatsApp, Viber, Gallery) from your phone share menu below</p>
+              <p className="text-[11px] text-slate-400">Receipt Photo generated! Choose your mobile action below:</p>
             </div>
           ) : (
             <p className="text-xs text-red-400">Failed to render receipt image.</p>
           )}
         </div>
 
-        {/* Mobile Action Controls */}
-        <div className="flex items-center gap-2 pt-2">
+        {/* Action Controls Grid */}
+        <div className="space-y-2 pt-1">
+          {/* Direct WhatsApp Share Action */}
           <button
             type="button"
-            onClick={handleDownload}
+            onClick={handleDirectWhatsApp}
             disabled={!imageUri || isGenerating}
-            className="flex-1 py-3 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <Download className="w-4 h-4 text-cyan-400" /> Save Photo
+            <MessageSquare className="w-4 h-4 text-white" /> Open WhatsApp App & Attach Photo
           </button>
 
-          <button
-            type="button"
-            onClick={handleNativeShare}
-            disabled={!imageUri || isGenerating}
-            className="flex-1 py-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <Share2 className="w-4 h-4 text-white" /> Mobile App Options
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Mobile Native App Share Sheet */}
+            <button
+              type="button"
+              onClick={handleSystemShare}
+              disabled={!imageUri || isGenerating}
+              className="py-2.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-950 border border-amber-800/80 hover:bg-amber-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Share2 className="w-3.5 h-3.5 text-amber-400" /> System Share Menu
+            </button>
+
+            {/* Save Photo */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!imageUri || isGenerating}
+              className="py-2.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5 text-cyan-400" /> Save Photo
+            </button>
+          </div>
         </div>
       </div>
     </div>
