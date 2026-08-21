@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText, Settings, RefreshCw, Smartphone } from 'lucide-react';
 
 interface ScannedBillItem {
@@ -21,17 +22,24 @@ interface OutsideBillScannerProps {
 }
 
 export default function OutsideBillScanner({ onBillScanned }: OutsideBillScannerProps) {
+  const [mounted, setMounted] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [scannedImage, setScannedImage] = useState<string | null>(null);
 
-  // Permission Request & Mobile Settings Guide Modal State
+  // Permission Request & Mobile Settings Guide State
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [showSettingsGuide, setShowSettingsGuide] = useState(false);
   const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const directInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Process selected or captured image file
   const processImageFile = async (file: File) => {
@@ -85,6 +93,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
         setScanStatus('✓ Bill Header, Logo & Parts Processed!');
         setIsScanning(false);
+        setIsOpen(false);
       };
 
       reader.readAsDataURL(file);
@@ -92,6 +101,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       console.error('Scan Error:', err);
       setScanStatus('✓ Bill Photo Attached!');
       setIsScanning(false);
+      setIsOpen(false);
     }
   };
 
@@ -109,7 +119,8 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera hardware API not supported on this browser context.');
+        directInputRef.current?.click();
+        return;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -163,114 +174,124 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       setScanStatus('✓ Bill Header, Logo & Bill Captured!');
     }
     stopLiveCamera();
+    setIsOpen(false);
   };
 
-  return (
-    <div className="p-3.5 rounded-2xl bg-slate-950 border border-amber-800/80 space-y-3">
-      {/* Header Title */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span className="text-xs font-bold text-amber-300">
-            Outside Bill & Logo Scanner (පිට කඩේ බිල් පත Scan කර කොටස් එකතු කරන්න)
-          </span>
-        </div>
-        {scannedImage && (
+  // Standalone Fullscreen Portal Modal for Bill Scanner
+  const modalPortal = isOpen && mounted ? createPortal(
+    <div className="fixed inset-0 z-[9999999] bg-slate-950/95 flex flex-col justify-between p-4 sm:p-6 animate-in fade-in overflow-y-auto">
+      <div className="w-full max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4 my-auto shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+            <Camera className="w-5 h-5 text-amber-400" />
+            <span>Outside Shop Bill Camera & Scanner</span>
+          </div>
           <button
             type="button"
-            onClick={() => {
-              setScannedImage(null);
-              setScanStatus('');
-            }}
-            className="text-[10px] text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+            onClick={() => setIsOpen(false)}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white bg-slate-800"
           >
-            <X className="w-3 h-3" /> Clear Bill
+            <X className="w-5 h-5" />
           </button>
-        )}
-      </div>
+        </div>
 
-      {/* Standard Failproof Mobile File & Camera Selector Input */}
-      <div className="p-3 rounded-xl bg-slate-900 border border-amber-800/80 space-y-2">
-        <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
-          <Camera className="w-4 h-4 text-amber-400" />
-          <span>📷 Select Paper Bill Photo / Take Photo:</span>
-        </label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="w-full text-xs text-slate-200 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-gradient-to-r file:from-amber-400 file:to-amber-500 file:text-slate-950 hover:file:from-amber-300 hover:file:to-amber-400 cursor-pointer"
-        />
-        <p className="text-[10px] text-slate-400 italic">
-          💡 "Choose File" touch කළ විට Android/iPhone මගින් <b>Camera</b> හෝ <b>Files/Gallery</b> තෝරාගැනීමට අවස්ථාව ලබාදෙයි.
-        </p>
-      </div>
+        {/* 100% Direct Unblocked File Input */}
+        <div className="p-4 rounded-xl bg-slate-950 border border-amber-800/80 space-y-2">
+          <label className="block text-xs font-bold text-amber-300">
+            📷 Select Paper Bill Photo or Snap Camera Photo:
+          </label>
+          <input
+            ref={directInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full text-xs text-slate-200 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-gradient-to-r file:from-amber-400 file:to-amber-500 file:text-slate-950 hover:file:from-amber-300 hover:file:to-amber-400 cursor-pointer"
+          />
+          <p className="text-[11px] text-slate-400 italic">
+            💡 "Choose File" touch කළ සැනින් ඔබේ Phone එකෙහි <b>Camera</b> සහ <b>Gallery</b> එක පාරින්ම Open වේ.
+          </p>
+        </div>
 
-      {/* Secondary Action Buttons for In-App Live Camera */}
-      <div className="flex items-center gap-2">
+        {/* Live Viewfinder Camera Button */}
         <button
           type="button"
           onClick={requestCameraPermission}
-          className="w-full py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+          className="w-full py-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
         >
           <Scan className="w-4 h-4 text-cyan-200" />
           <span>🔍 Live Screen Viewfinder Camera</span>
         </button>
-      </div>
 
-      {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
-      {showSettingsGuide && (
-        <div className="p-3.5 rounded-2xl bg-amber-950/80 border border-amber-800 text-amber-200 text-xs space-y-3 animate-in fade-in">
-          <div className="flex items-start gap-2 font-bold text-amber-300">
-            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-white">📱 Mobile OS / Browser Camera Access Allow කරන ආකාරය:</p>
-              <p className="text-[11px] text-amber-300 font-normal">
-                Phone Settings මගින් Chrome හෝ Safari සඳහා Camera permission සක්‍රීය කරගත හැක:
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] bg-slate-950/90 p-3 rounded-xl border border-amber-900/60">
-            {/* Android System Settings Instructions */}
-            <div className="space-y-1">
-              <p className="font-bold text-cyan-400 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" /> Android Phone Settings:
-              </p>
-              <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
-                <li>Phone <b>Settings</b> → <b>Apps & Notifications</b> යන්න.</li>
-                <li><b>Chrome</b> (හෝ ඔබේ Browser එක) තෝරන්න.</li>
-                <li><b>Permissions</b> → <b>Camera</b> → <b>Allow</b> තෝරන්න.</li>
-              </ol>
+        {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
+        {showSettingsGuide && (
+          <div className="p-3.5 rounded-2xl bg-amber-950/80 border border-amber-800 text-amber-200 text-xs space-y-3 animate-in fade-in">
+            <div className="flex items-start gap-2 font-bold text-amber-300">
+              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-white">📱 Mobile OS / Browser Camera Access Allow කරන ආකාරය:</p>
+                <p className="text-[11px] text-amber-300 font-normal">
+                  Phone Settings මගින් Chrome හෝ Safari සඳහා Camera permission සක්‍රීය කරගත හැක:
+                </p>
+              </div>
             </div>
 
-            {/* iPhone iOS Settings Instructions */}
-            <div className="space-y-1">
-              <p className="font-bold text-purple-400 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" /> iPhone iOS Settings:
-              </p>
-              <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
-                <li>iPhone <b>Settings</b> → <b>Safari</b> (හෝ Chrome) යන්න.</li>
-                <li><b>Camera</b> → <b>Allow / Ask</b> ලබා දෙන්න.</li>
-              </ol>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] bg-slate-950/90 p-3 rounded-xl border border-amber-900/60">
+              <div className="space-y-1">
+                <p className="font-bold text-cyan-400 flex items-center gap-1">
+                  <Smartphone className="w-3.5 h-3.5" /> Android Phone Settings:
+                </p>
+                <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
+                  <li>Phone <b>Settings</b> → <b>Apps & Notifications</b> යන්න.</li>
+                  <li><b>Chrome</b> (හෝ ඔබේ Browser එක) තෝරන්න.</li>
+                  <li><b>Permissions</b> → <b>Camera</b> → <b>Allow</b> තෝරන්න.</li>
+                </ol>
+              </div>
+
+              <div className="space-y-1">
+                <p className="font-bold text-purple-400 flex items-center gap-1">
+                  <Smartphone className="w-3.5 h-3.5" /> iPhone iOS Settings:
+                </p>
+                <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
+                  <li>iPhone <b>Settings</b> → <b>Safari</b> (හෝ Chrome) යන්න.</li>
+                  <li><b>Camera</b> → <b>Allow / Ask</b> ලබා දෙන්න.</li>
+                </ol>
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={requestCameraPermission}
-              className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> 🔄 Try Camera Again
-            </button>
-          </div>
+        <div className="flex items-center justify-end border-t border-slate-800 pt-3">
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 bg-slate-950 border border-slate-800 hover:text-white"
+          >
+            Close Scanner
+          </button>
         </div>
-      )}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <div className="space-y-2">
+      {/* Embedded Main Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className="w-full py-2.5 px-4 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+      >
+        <Camera className="w-4 h-4 text-slate-950" />
+        <span>📷 Open Outside Bill Scanner & Camera</span>
+      </button>
+
+      {/* Standalone Fullscreen Portal Modal */}
+      {modalPortal}
 
       {/* Live Full-Screen Scanner Viewfinder Modal */}
-      {isLiveCameraOpen && (
-        <div className="fixed inset-0 z-[999999] bg-slate-950/95 flex flex-col items-center justify-between p-4 animate-in fade-in">
+      {isLiveCameraOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999999] bg-slate-950/95 flex flex-col items-center justify-between p-4 animate-in fade-in">
           <div className="w-full max-w-lg flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <Scan className="w-5 h-5 text-amber-400 animate-pulse" />
@@ -287,7 +308,6 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             </button>
           </div>
 
-          {/* Camera Viewfinder with Overlay Reticle */}
           <div className="w-full max-w-lg my-auto aspect-[3/4] bg-black rounded-3xl overflow-hidden relative border-2 border-amber-500/50 shadow-2xl">
             <video
               ref={videoRef}
@@ -296,7 +316,6 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
               className="w-full h-full object-cover"
             />
 
-            {/* Glowing Target Scanner Framing Box */}
             <div className="absolute inset-6 border-2 border-dashed border-cyan-400/80 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-4 bg-cyan-950/10 backdrop-blur-[1px]">
               <div className="w-full flex justify-between text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-800">
                 <span>Align Bill Header & Logo Top</span>
@@ -324,7 +343,8 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
               <Camera className="w-4 h-4" /> Capture Bill & Extract Parts Now
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Scanning Status Banner */}
