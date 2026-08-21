@@ -191,45 +191,33 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       </div>
 
       {/* 
-        Action Buttons:
-        Each file input occupies the full button bounding box with opacity-0 (sr-only overlay).
-        This guarantees 100% direct native C++ browser touch dispatch without display:none skipping!
+        DIRECT FAILPROOF NATIVE FILE INPUT (Native Browser File Picker)
+        Renders a 100% unblocked native HTML file picker directly on screen!
       */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Direct Hardware Camera Input (Directly Overlaid Input) */}
-        <div className="relative py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center overflow-hidden">
-          <Camera className="w-4 h-4 text-slate-950" />
-          <span>📷 Snap Bill Photo</span>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-        </div>
+      <div className="p-3 rounded-xl bg-slate-900 border border-amber-800/80 space-y-2">
+        <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
+          <Camera className="w-4 h-4 text-amber-400" />
+          <span>📷 Select or Take Paper Bill Photo (Phone Camera / Gallery):</span>
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          className="w-full text-xs text-slate-200 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-gradient-to-r file:from-amber-400 file:to-amber-500 file:text-slate-950 hover:file:from-amber-300 hover:file:to-amber-400 cursor-pointer"
+        />
+      </div>
 
-        {/* Button 2: Smart OCR Live Scanner */}
+      {/* Secondary Action Buttons for In-App Live Camera */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={requestCameraPermission}
-          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+          className="w-full py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
         >
           <Scan className="w-4 h-4 text-cyan-200" />
-          <span>🔍 Live Smart OCR Scan</span>
+          <span>🔍 Live Screen Viewfinder Camera</span>
         </button>
-
-        {/* Button 3: Upload Photo from Gallery (Directly Overlaid Input) */}
-        <div className="relative py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center overflow-hidden">
-          <Upload className="w-4 h-4 text-amber-400" />
-          <span>📁 Gallery Upload</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-        </div>
       </div>
 
       {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
@@ -278,17 +266,6 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             >
               <RefreshCw className="w-3.5 h-3.5" /> 🔄 Try Camera Again
             </button>
-
-            {/* Direct Native Camera Intent Chooser Fallback */}
-            <div className="relative py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer overflow-hidden">
-              <Camera className="w-3.5 h-3.5 text-amber-400" /> Open Photo Intent
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              />
-            </div>
           </div>
         </div>
       )}
