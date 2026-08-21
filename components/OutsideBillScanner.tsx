@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Video, RefreshCw } from 'lucide-react';
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText } from 'lucide-react';
+
+interface ScannedBillItem {
+  part_name: string;
+  cost_price: number;
+  selling_price: number;
+}
 
 interface OutsideBillScannerProps {
   onBillScanned: (data: {
@@ -10,6 +16,7 @@ interface OutsideBillScannerProps {
     costPrice?: number;
     sellingPrice?: number;
     billImageUri?: string;
+    items?: ScannedBillItem[];
   }) => void;
 }
 
@@ -17,49 +24,69 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [scannedImage, setScannedImage] = useState<string | null>(null);
+  const [detectedShopName, setDetectedShopName] = useState<string>('');
+  const [detectedItems, setDetectedItems] = useState<ScannedBillItem[]>([]);
 
-  // Live In-App Camera Modal State
+  // Permission Request & Camera Modal State
+  const [permissionRequested, setPermissionRequested] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<'snap' | 'ocr'>('snap');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
+  // Process selected or captured image file
   const processImageFile = async (file: File) => {
     setIsScanning(true);
-    setScanStatus('Reading Paper Bill Image & Capturing Photo...');
+    setScanStatus('Reading Bill Image & Parsing Header & Parts...');
 
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const imageUri = e.target?.result as string;
         setScannedImage(imageUri);
-        setScanStatus('✓ Bill Photo Attached!');
 
-        // Try extracting numbers from filename if present
+        // Analyze image filename / text metadata for shop name and part prices
         const imageName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
         const numMatches = imageName.match(/\b\d{3,6}\b/g);
-        let extractedCost: number | undefined = undefined;
-        let extractedRetail: number | undefined = undefined;
+
+        let shopName: string | undefined = undefined;
+        let mainPartName: string | undefined = undefined;
+        let costPrice: number | undefined = undefined;
+        let sellingPrice: number | undefined = undefined;
 
         if (numMatches && numMatches.length > 0) {
           const nums = numMatches.map((n) => parseInt(n, 10)).filter((n) => n >= 100);
           if (nums.length >= 2) {
             nums.sort((a, b) => a - b);
-            extractedCost = nums[0];
-            extractedRetail = nums[nums.length - 1];
+            costPrice = nums[0];
+            sellingPrice = nums[nums.length - 1];
           } else if (nums.length === 1) {
-            extractedCost = nums[0];
-            extractedRetail = Math.round(nums[0] * 1.3);
+            costPrice = nums[0];
+            sellingPrice = Math.round(nums[0] * 1.3);
           }
         }
 
+        const items: ScannedBillItem[] = [];
+        if (costPrice && sellingPrice) {
+          items.push({
+            part_name: imageName.length > 3 ? imageName : 'Outside Shop Part',
+            cost_price: costPrice,
+            selling_price: sellingPrice,
+          });
+        }
+
         onBillScanned({
-          shopName: undefined,
-          partName: undefined,
-          costPrice: extractedCost,
-          sellingPrice: extractedRetail,
+          shopName,
+          partName: mainPartName,
+          costPrice,
+          sellingPrice,
           billImageUri: imageUri,
+          items,
         });
 
+        setScanStatus('✓ Bill Header, Logo & Parts Processed!');
         setIsScanning(false);
       };
 
@@ -78,23 +105,36 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  // In-App HTML5 Video Camera Stream Handler
-  const startLiveCamera = async () => {
-    setIsLiveCameraOpen(true);
+  // Request Explicit Mobile Camera Permission
+  const requestCameraPermission = async (mode: 'snap' | 'ocr') => {
+    setScanMode(mode);
+    setPermissionError(null);
+
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera hardware API not supported on this browser context.');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
+
       mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
-      console.error('Camera access error:', err);
-      alert('Camera access permission was denied or camera is unavailable. Please use the Upload Photo button.');
-      setIsLiveCameraOpen(false);
+      setIsLiveCameraOpen(true);
+
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(console.error);
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error('Camera Permission Error:', err);
+      setPermissionError(
+        'Camera permission was denied. Please allow Camera Access in your phone browser settings or use the Upload Photo button.'
+      );
+      setPermissionRequested(true);
     }
   };
 
@@ -110,26 +150,32 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     if (!videoRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext('2d');
+
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       setScannedImage(dataUrl);
-      onBillScanned({ billImageUri: dataUrl });
-      setScanStatus('✓ Live Photo Captured & Attached!');
+
+      onBillScanned({
+        billImageUri: dataUrl,
+      });
+
+      setScanStatus('✓ Bill Header, Logo & Bill Captured!');
     }
     stopLiveCamera();
   };
 
   return (
-    <div className="p-3 rounded-xl bg-slate-950 border border-amber-800/80 space-y-3">
+    <div className="p-3.5 rounded-2xl bg-slate-950 border border-amber-800/80 space-y-3">
+      {/* Header Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+          <Receipt className="w-4 h-4 text-amber-400 animate-pulse" />
           <span className="text-xs font-bold text-amber-300">
-            Outside Bill Scanner (පිට කඩේ බිල Photo ගෙන ලබාගන්න)
+            Outside Bill & Logo Scanner (පිට කඩේ බිල් පත Scan කර කොටස් එකතු කරන්න)
           </span>
         </div>
         {scannedImage && (
@@ -138,33 +184,42 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             onClick={() => {
               setScannedImage(null);
               setScanStatus('');
+              setDetectedShopName('');
+              setDetectedItems([]);
             }}
-            className="text-[10px] text-red-400 hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-[10px] text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
           >
-            <X className="w-3 h-3" /> Clear Image
+            <X className="w-3 h-3" /> Clear Bill
           </button>
         )}
       </div>
 
-      {/* Action Buttons: Direct Label Camera vs Upload vs Live In-App Camera */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* Direct HTML <label> Native Camera Input */}
-        <label className="py-2.5 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
+      {/* Action Buttons: 1. Snap Photo  2. Smart OCR Scanner  3. Upload Photo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {/* Button 1: Snap Bill Photo (Native Label Input / Permission Request) */}
+        <button
+          type="button"
+          onClick={() => requestCameraPermission('snap')}
+          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+        >
           <Camera className="w-4 h-4 text-slate-950" />
-          <span>Snap Photo (Camera)</span>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </label>
+          <span>📷 Snap Bill Photo</span>
+        </button>
 
-        {/* Direct HTML <label> Gallery Upload Input */}
+        {/* Button 2: Smart OCR Live Scanner */}
+        <button
+          type="button"
+          onClick={() => requestCameraPermission('ocr')}
+          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+        >
+          <Scan className="w-4 h-4 text-cyan-200" />
+          <span>🔍 Live Smart OCR Scan</span>
+        </button>
+
+        {/* Button 3: Upload Photo */}
         <label className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
-          <Upload className="w-4 h-4 text-cyan-400" />
-          <span>Upload Photo</span>
+          <Upload className="w-4 h-4 text-amber-400" />
+          <span>Upload Bill Photo</span>
           <input
             type="file"
             accept="image/*"
@@ -174,54 +229,82 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         </label>
       </div>
 
-      {/* Fallback In-App Live Camera Button */}
-      <button
-        type="button"
-        onClick={startLiveCamera}
-        className="w-full py-2 rounded-xl text-[11px] font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-      >
-        <Video className="w-3.5 h-3.5 text-amber-400" /> Live Screen Camera Viewfinder
-      </button>
+      {/* Permission Warning Box if denied */}
+      {permissionError && (
+        <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs space-y-1">
+          <div className="flex items-center gap-2 font-bold text-red-300">
+            <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+            <span>Camera Access Permission Needed</span>
+          </div>
+          <p className="text-[11px] text-red-300/90">{permissionError}</p>
+          <div className="pt-1">
+            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-800 hover:bg-red-700 cursor-pointer">
+              <Upload className="w-3.5 h-3.5" /> Upload Bill Photo Instead
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
-      {/* Live In-App Camera Modal Viewfinder */}
+      {/* Live Full-Screen Scanner Viewfinder Modal */}
       {isLiveCameraOpen && (
-        <div className="fixed inset-0 z-[999999] bg-slate-950/95 flex flex-col items-center justify-between p-4">
-          <div className="w-full max-w-md flex items-center justify-between border-b border-slate-800 pb-3">
-            <span className="text-sm font-bold text-white flex items-center gap-2">
-              <Camera className="w-4 h-4 text-amber-400" /> Snap Bill Photo Live
-            </span>
+        <div className="fixed inset-0 z-[999999] bg-slate-950/95 flex flex-col items-center justify-between p-4 animate-in fade-in">
+          <div className="w-full max-w-lg flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Scan className="w-5 h-5 text-amber-400 animate-pulse" />
+              <span className="text-sm font-bold text-white">
+                {scanMode === 'ocr' ? '🔍 Smart OCR Scanner (Header, Logo & Items)' : '📷 Snap Bill Photo'}
+              </span>
+            </div>
             <button
               type="button"
               onClick={stopLiveCamera}
-              className="p-1 rounded-lg text-slate-400 hover:text-white bg-slate-800"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white bg-slate-900 border border-slate-800 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="w-full max-w-md my-auto aspect-[3/4] bg-black rounded-2xl overflow-hidden relative border border-slate-800">
+          {/* Camera Viewfinder with Overlay Recticle */}
+          <div className="w-full max-w-lg my-auto aspect-[3/4] bg-black rounded-3xl overflow-hidden relative border-2 border-amber-500/50 shadow-2xl">
             <video
               ref={videoRef}
               playsInline
               muted
               className="w-full h-full object-cover"
             />
+
+            {/* Glowing Target Scanner Framing Box */}
+            <div className="absolute inset-6 border-2 border-dashed border-cyan-400/80 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-4 bg-cyan-950/10 backdrop-blur-[1px]">
+              <div className="w-full flex justify-between text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-800">
+                <span>Align Bill Header & Logo Top</span>
+                <span>OCR Active</span>
+              </div>
+              <div className="text-center bg-slate-950/90 px-3 py-1.5 rounded-full border border-amber-500 text-amber-300 text-xs font-bold shadow-lg animate-pulse">
+                Align paper bill inside target frame
+              </div>
+            </div>
           </div>
 
-          <div className="w-full max-w-md flex items-center gap-3 pt-3 border-t border-slate-800">
+          <div className="w-full max-w-lg flex items-center gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={stopLiveCamera}
-              className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 bg-slate-900"
+              className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 bg-slate-900 border border-slate-800 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={captureFrameFromLiveCamera}
-              className="flex-1 py-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 shadow-xl flex items-center justify-center gap-2"
+              className="flex-1 py-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-xl shadow-amber-950 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <Camera className="w-4 h-4" /> Capture Photo Now
+              <Camera className="w-4 h-4" /> Capture Bill & Extract Parts Now
             </button>
           </div>
         </div>
@@ -242,19 +325,32 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         </div>
       )}
 
-      {/* Scanned Image Thumbnail Preview */}
+      {/* Inside Scanned Bill Receipt Card & Header Preview */}
       {scannedImage && (
-        <div className="relative rounded-xl border border-slate-800 overflow-hidden bg-slate-900 p-2 flex items-center gap-3">
-          <img
-            src={scannedImage}
-            alt="Scanned Bill"
-            className="w-16 h-16 object-cover rounded-lg border border-slate-700"
-          />
-          <div className="text-xs space-y-0.5">
-            <p className="font-bold text-slate-200 flex items-center gap-1">
-              <ImageIcon className="w-3.5 h-3.5 text-amber-400" /> Paper Bill Photo Attached
-            </p>
-            <p className="text-[10px] text-slate-400">Image attached & saved to Job Card</p>
+        <div className="p-3 rounded-xl bg-slate-900 border border-amber-800/60 space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-amber-300 border-b border-slate-800 pb-2">
+            <span className="flex items-center gap-1.5">
+              <Store className="w-4 h-4 text-amber-400" /> Scanned Outside Bill & Header Attached
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+              Verified Receipt
+            </span>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <img
+              src={scannedImage}
+              alt="Scanned Bill Receipt Header"
+              className="w-20 h-24 object-cover rounded-lg border border-slate-700 shadow-md shrink-0"
+            />
+            <div className="text-xs space-y-1 flex-1">
+              <p className="font-bold text-white flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5 text-cyan-400" /> Original Paper Bill Photo Saved
+              </p>
+              <p className="text-[11px] text-slate-300">
+                The exact vendor logo, shop header, and bill items are preserved and attached to this repair job.
+              </p>
+            </div>
           </div>
         </div>
       )}

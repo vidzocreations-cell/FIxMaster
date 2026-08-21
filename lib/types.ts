@@ -79,6 +79,7 @@ export interface JobCard {
   ext_part_name?: string;
   ext_cost_price?: number;
   ext_selling_price?: number;
+  ext_bill_image_uri?: string;
   parts?: JobPart[];
   created_at: string;
   updated_at?: string;
