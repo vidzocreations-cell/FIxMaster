@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText, Settings, RefreshCw, Smartphone, HelpCircle } from 'lucide-react';
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText, Settings, RefreshCw, Smartphone, CheckCircle } from 'lucide-react';
 
 interface ScannedBillItem {
   part_name: string;
@@ -32,6 +32,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null);
 
   // Process selected or captured image file
   const processImageFile = async (file: File) => {
@@ -102,30 +103,40 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  // Request Explicit Mobile Camera Permission
-  const requestCameraPermission = async () => {
+  // Trigger System Camera Access Permission Prompt (One-Time / App Permission)
+  const requestCameraPermission = async (targetMode: 'snap' | 'live' = 'live') => {
     setPermissionError(null);
     setShowSettingsGuide(false);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera hardware API not supported on this browser context.');
+        // Fallback to native hardware camera input if getUserMedia is restricted
+        nativeCameraInputRef.current?.click();
+        return;
       }
 
+      // Triggers Phone OS System Camera Access Dialog ("Only this time" / "While using app")
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
 
-      mediaStreamRef.current = stream;
-      setIsLiveCameraOpen(true);
+      if (targetMode === 'snap') {
+        // Open native camera hardware once permission is verified
+        stream.getTracks().forEach((t) => t.stop());
+        nativeCameraInputRef.current?.click();
+      } else {
+        // Open live camera viewfinder
+        mediaStreamRef.current = stream;
+        setIsLiveCameraOpen(true);
 
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(console.error);
-        }
-      }, 100);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(console.error);
+          }
+        }, 100);
+      }
     } catch (err: any) {
       console.error('Camera Permission Error:', err);
       setPermissionError(
@@ -167,6 +178,16 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
   return (
     <div className="p-3.5 rounded-2xl bg-slate-950 border border-amber-800/80 space-y-3">
+      {/* Hidden Native Camera Input Element */}
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       {/* Header Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -189,25 +210,22 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         )}
       </div>
 
-      {/* Action Buttons: 1. Snap Photo (Direct Native Hardware Label)  2. Smart OCR Scanner  3. Upload Photo */}
+      {/* Action Buttons: 1. Snap Photo (Triggers One-Time Permission System Dialog)  2. Smart OCR Scanner  3. Upload Photo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Snap Bill Photo (Direct Native HTML Label Input - Works without stream permission locks!) */}
-        <label className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
-          <Camera className="w-4 h-4 text-slate-950" />
-          <span>📷 Snap Bill Photo</span>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </label>
-
-        {/* Button 2: Smart OCR Live Scanner (Stream Video Camera) */}
+        {/* Button 1: Snap Bill Photo */}
         <button
           type="button"
-          onClick={requestCameraPermission}
+          onClick={() => requestCameraPermission('snap')}
+          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+        >
+          <Camera className="w-4 h-4 text-slate-950" />
+          <span>📷 Snap Bill Photo</span>
+        </button>
+
+        {/* Button 2: Smart OCR Live Scanner */}
+        <button
+          type="button"
+          onClick={() => requestCameraPermission('live')}
           className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
         >
           <Scan className="w-4 h-4 text-cyan-200" />
@@ -233,9 +251,9 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
           <div className="flex items-start gap-2 font-bold text-amber-300">
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-white">📱 Phone Browser එකෙහි Camera Permission Allow කරන ආකාරය:</p>
+              <p className="text-sm text-white">📱 Phone Settings වලින් Camera Access Allow කරන ආකාරය:</p>
               <p className="text-[11px] text-amber-300 font-normal">
-                Browser එක මගින් Camera Access Block කර ඇත්නම් පහත සරල පියවර මගින් Permission සක්‍රීය (Allow) කරගත හැක:
+                Browser එකෙහි Camera Access Block කර ඇත්නම්, "Only this time" හෝ "Allow" ලබාදී Camera සක්‍රීය කරගන්න:
               </p>
             </div>
           </div>
@@ -269,10 +287,10 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
           <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
-              onClick={requestCameraPermission}
+              onClick={() => requestCameraPermission('live')}
               className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> 🔄 Re-check & Enable Camera
+              <RefreshCw className="w-3.5 h-3.5" /> 🔄 Allow Camera & Try Again
             </button>
 
             <label className="py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
