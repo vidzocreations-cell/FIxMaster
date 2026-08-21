@@ -130,7 +130,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     } catch (err: any) {
       console.error('Camera Permission Error:', err);
       setPermissionError(
-        'Phone Browser එකෙහි Camera Permission එක Block වී ඇත. පහත පියවර අනුගමනය කර Settings වලින් Camera එක Allow කරන්න.'
+        'Phone OS / Browser එකෙහි Camera Permission එක Block වී ඇත. Settings වලින් Camera Access Allow කර නැවත උත්සාහ කරන්න.'
       );
       setShowSettingsGuide(true);
     }
@@ -191,19 +191,18 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       </div>
 
       {/* Action Buttons: 
-          1. Direct Native Hardware Camera Label (Opens Phone Camera App directly!)
-          2. Live Smart OCR Scan (Stream Viewfinder)
+          1. System Camera / Intent Chooser (Universal Failproof Native Photo Capture)
+          2. Live In-App Camera Stream
           3. Upload Photo from Gallery
       */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Direct Native Camera Label (Opens Phone Camera App directly without browser permission locks!) */}
+        {/* Button 1: Universal Native Camera Choice (Triggers Android Native Intent Chooser: Camera / Photos) */}
         <label className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
           <Camera className="w-4 h-4 text-slate-950" />
-          <span>📷 Snap Bill Photo</span>
+          <span>📷 Take Bill Photo (Camera)</span>
           <input
             type="file"
-            accept="image/*"
-            capture="environment"
+            accept="image/*,image/heic,image/heif"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -222,7 +221,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         {/* Button 3: Upload Photo */}
         <label className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
           <Upload className="w-4 h-4 text-amber-400" />
-          <span>Upload Photo</span>
+          <span>📁 Gallery Upload</span>
           <input
             type="file"
             accept="image/*"
@@ -232,41 +231,40 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         </label>
       </div>
 
-      {/* Mobile Settings Permission Guide Box (If blocked in browser settings) */}
+      {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
       {showSettingsGuide && (
         <div className="p-3.5 rounded-2xl bg-amber-950/80 border border-amber-800 text-amber-200 text-xs space-y-3 animate-in fade-in">
           <div className="flex items-start gap-2 font-bold text-amber-300">
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-white">📱 Browser එකෙහි Camera Permission Allow කරන ආකාරය:</p>
+              <p className="text-sm text-white">📱 Mobile OS / Browser Camera Access Allow කරන ආකාරය:</p>
               <p className="text-[11px] text-amber-300 font-normal">
-                Browser එකෙහි Camera Access Block වී ඇත. පහත රූපසටහන් අනුව උඩින්ම ඇති Lock Icon එක touch කර Camera Allow කරන්න:
+                Phone Settings මගින් Chrome හෝ Safari සඳහා Camera permission සක්‍රීය කරගත හැක:
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] bg-slate-950/90 p-3 rounded-xl border border-amber-900/60">
-            {/* Android Chrome Instructions */}
+            {/* Android System Settings Instructions */}
             <div className="space-y-1">
               <p className="font-bold text-cyan-400 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" /> Android Chrome / Brave:
+                <Smartphone className="w-3.5 h-3.5" /> Android Phone Settings:
               </p>
               <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
-                <li>Screen එක උඩින්ම ඇති <b>🔒 Lock (Site Settings)</b> icon එක touch කරන්න.</li>
-                <li><b>Permissions</b> → <b>Camera</b> තෝරන්න.</li>
-                <li><b>Allow (අවසර දෙන්න)</b> තෝරා පිටුව Refresh කරන්න.</li>
+                <li>Phone <b>Settings</b> → <b>Apps & Notifications</b> යන්න.</li>
+                <li><b>Chrome</b> (හෝ ඔබේ Browser එක) තෝරන්න.</li>
+                <li><b>Permissions</b> → <b>Camera</b> → <b>Allow</b> තෝරන්න.</li>
               </ol>
             </div>
 
-            {/* iPhone Safari Instructions */}
+            {/* iPhone iOS Settings Instructions */}
             <div className="space-y-1">
               <p className="font-bold text-purple-400 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" /> iPhone iOS Safari:
+                <Smartphone className="w-3.5 h-3.5" /> iPhone iOS Settings:
               </p>
               <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
-                <li>URL bar එකෙහි වම්පස ඇති <b>aA / Settings</b> icon එක touch කරන්න.</li>
-                <li><b>Website Settings</b> → <b>Camera</b> තෝරන්න.</li>
-                <li><b>Allow</b> ලබා දී Done ඔබන්න.</li>
+                <li>iPhone <b>Settings</b> → <b>Safari</b> (හෝ Chrome) යන්න.</li>
+                <li><b>Camera</b> → <b>Allow / Ask</b> ලබා දෙන්න.</li>
               </ol>
             </div>
           </div>
@@ -280,13 +278,12 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
               <RefreshCw className="w-3.5 h-3.5" /> 🔄 Try Camera Again
             </button>
 
-            {/* Direct Native Camera Input Label Fallback inside Guide */}
+            {/* Direct Native Camera Intent Chooser Fallback */}
             <label className="py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
-              <Camera className="w-3.5 h-3.5 text-amber-400" /> Open Phone Camera App
+              <Camera className="w-3.5 h-3.5 text-amber-400" /> Open Photo Intent
               <input
                 type="file"
-                accept="image/*"
-                capture="environment"
+                accept="image/*,image/heic,image/heif"
                 onChange={handleFileChange}
                 className="hidden"
               />
