@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText } from 'lucide-react';
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, X, Sparkles, Scan, ShieldAlert, Store, Receipt, FileText, Settings, RefreshCw, Smartphone, HelpCircle } from 'lucide-react';
 
 interface ScannedBillItem {
   part_name: string;
@@ -24,14 +24,11 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [scannedImage, setScannedImage] = useState<string | null>(null);
-  const [detectedShopName, setDetectedShopName] = useState<string>('');
-  const [detectedItems, setDetectedItems] = useState<ScannedBillItem[]>([]);
 
-  // Permission Request & Camera Modal State
-  const [permissionRequested, setPermissionRequested] = useState(false);
+  // Permission Request & Mobile Settings Guide Modal State
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [showSettingsGuide, setShowSettingsGuide] = useState(false);
   const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
-  const [scanMode, setScanMode] = useState<'snap' | 'ocr'>('snap');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -106,9 +103,9 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
   };
 
   // Request Explicit Mobile Camera Permission
-  const requestCameraPermission = async (mode: 'snap' | 'ocr') => {
-    setScanMode(mode);
+  const requestCameraPermission = async () => {
     setPermissionError(null);
+    setShowSettingsGuide(false);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -132,9 +129,9 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     } catch (err: any) {
       console.error('Camera Permission Error:', err);
       setPermissionError(
-        'Camera permission was denied. Please allow Camera Access in your phone browser settings or use the Upload Photo button.'
+        'Phone Browser එකෙහි Camera Permission එක Block වී ඇත. පහත පියවර අනුගමනය කර Settings වලින් Camera එක Allow කරන්න.'
       );
-      setPermissionRequested(true);
+      setShowSettingsGuide(true);
     }
   };
 
@@ -184,8 +181,6 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             onClick={() => {
               setScannedImage(null);
               setScanStatus('');
-              setDetectedShopName('');
-              setDetectedItems([]);
             }}
             className="text-[10px] text-red-400 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
           >
@@ -194,22 +189,25 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         )}
       </div>
 
-      {/* Action Buttons: 1. Snap Photo  2. Smart OCR Scanner  3. Upload Photo */}
+      {/* Action Buttons: 1. Snap Photo (Direct Native Hardware Label)  2. Smart OCR Scanner  3. Upload Photo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Snap Bill Photo (Native Label Input / Permission Request) */}
-        <button
-          type="button"
-          onClick={() => requestCameraPermission('snap')}
-          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
-        >
+        {/* Button 1: Snap Bill Photo (Direct Native HTML Label Input - Works without stream permission locks!) */}
+        <label className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
           <Camera className="w-4 h-4 text-slate-950" />
           <span>📷 Snap Bill Photo</span>
-        </button>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
 
-        {/* Button 2: Smart OCR Live Scanner */}
+        {/* Button 2: Smart OCR Live Scanner (Stream Video Camera) */}
         <button
           type="button"
-          onClick={() => requestCameraPermission('ocr')}
+          onClick={requestCameraPermission}
           className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
         >
           <Scan className="w-4 h-4 text-cyan-200" />
@@ -219,7 +217,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         {/* Button 3: Upload Photo */}
         <label className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
           <Upload className="w-4 h-4 text-amber-400" />
-          <span>Upload Bill Photo</span>
+          <span>Upload Photo</span>
           <input
             type="file"
             accept="image/*"
@@ -229,17 +227,56 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         </label>
       </div>
 
-      {/* Permission Warning Box if denied */}
-      {permissionError && (
-        <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs space-y-1">
-          <div className="flex items-center gap-2 font-bold text-red-300">
-            <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
-            <span>Camera Access Permission Needed</span>
+      {/* Mobile Settings Permission Guide Box (If blocked in browser settings) */}
+      {showSettingsGuide && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/80 border border-amber-800 text-amber-200 text-xs space-y-3 animate-in fade-in">
+          <div className="flex items-start gap-2 font-bold text-amber-300">
+            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-white">📱 Phone Browser එකෙහි Camera Permission Allow කරන ආකාරය:</p>
+              <p className="text-[11px] text-amber-300 font-normal">
+                Browser එක මගින් Camera Access Block කර ඇත්නම් පහත සරල පියවර මගින් Permission සක්‍රීය (Allow) කරගත හැක:
+              </p>
+            </div>
           </div>
-          <p className="text-[11px] text-red-300/90">{permissionError}</p>
-          <div className="pt-1">
-            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-800 hover:bg-red-700 cursor-pointer">
-              <Upload className="w-3.5 h-3.5" /> Upload Bill Photo Instead
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] bg-slate-950/90 p-3 rounded-xl border border-amber-900/60">
+            {/* Android Chrome Instructions */}
+            <div className="space-y-1">
+              <p className="font-bold text-cyan-400 flex items-center gap-1">
+                <Smartphone className="w-3.5 h-3.5" /> Android Chrome / Brave:
+              </p>
+              <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
+                <li>Screen එක උඩින්ම ඇති <b>🔒 Lock (Site Settings)</b> icon එක touch කරන්න.</li>
+                <li><b>Permissions</b> → <b>Camera</b> තෝරන්න.</li>
+                <li><b>Allow (අවසර දෙන්න)</b> තෝරා පිටුව Refresh කරන්න.</li>
+              </ol>
+            </div>
+
+            {/* iPhone Safari Instructions */}
+            <div className="space-y-1">
+              <p className="font-bold text-purple-400 flex items-center gap-1">
+                <Smartphone className="w-3.5 h-3.5" /> iPhone iOS Safari:
+              </p>
+              <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
+                <li>URL bar එකෙහි වම්පස ඇති <b>aA / Settings</b> icon එක touch කරන්න.</li>
+                <li><b>Website Settings</b> → <b>Camera</b> තෝරන්න.</li>
+                <li><b>Allow</b> ලබා දී Done ඔබන්න.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={requestCameraPermission}
+              className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 🔄 Re-check & Enable Camera
+            </button>
+
+            <label className="py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
+              <Upload className="w-3.5 h-3.5 text-cyan-400" /> Upload Photo Instead
               <input
                 type="file"
                 accept="image/*"
@@ -258,7 +295,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             <div className="flex items-center gap-2">
               <Scan className="w-5 h-5 text-amber-400 animate-pulse" />
               <span className="text-sm font-bold text-white">
-                {scanMode === 'ocr' ? '🔍 Smart OCR Scanner (Header, Logo & Items)' : '📷 Snap Bill Photo'}
+                🔍 Smart OCR Scanner (Header, Logo & Items)
               </span>
             </div>
             <button
@@ -270,7 +307,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             </button>
           </div>
 
-          {/* Camera Viewfinder with Overlay Recticle */}
+          {/* Camera Viewfinder with Overlay Reticle */}
           <div className="w-full max-w-lg my-auto aspect-[3/4] bg-black rounded-3xl overflow-hidden relative border-2 border-amber-500/50 shadow-2xl">
             <video
               ref={videoRef}
