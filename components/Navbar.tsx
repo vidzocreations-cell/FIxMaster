@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Wrench, ShieldCheck, Smartphone, RefreshCw, Zap, Settings } from 'lucide-react';
-import { getStoredJobs, getStoredParts } from '@/lib/supabase';
+import { Wrench, ShieldCheck, Smartphone, RefreshCw, Zap, Settings, Check } from 'lucide-react';
+import { getStoredJobs, getStoredParts, fetchJobsFromSupabaseCloud, fetchInvoicesFromSupabaseCloud, fetchProfileFromSupabaseCloud } from '@/lib/supabase';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -13,6 +13,7 @@ export default function Navbar() {
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [syncSuccessToast, setSyncSuccessToast] = useState(false);
 
   useEffect(() => {
     const jobs = getStoredJobs();
@@ -45,9 +46,11 @@ export default function Navbar() {
 
   const handleSyncUpdates = async () => {
     setIsUpdating(true);
+    setSyncSuccessToast(false);
 
     try {
       if (typeof window !== 'undefined') {
+        // 1. Purge all Service Workers
         if ('serviceWorker' in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const registration of registrations) {
@@ -55,20 +58,31 @@ export default function Navbar() {
           }
         }
 
+        // 2. Clear CacheStorage
         if ('caches' in window) {
           const keys = await caches.keys();
           for (const key of keys) {
             await caches.delete(key);
           }
         }
+
+        // 3. Live Sync from Supabase Cloud right now
+        await Promise.all([
+          fetchJobsFromSupabaseCloud(),
+          fetchInvoicesFromSupabaseCloud(),
+          fetchProfileFromSupabaseCloud(),
+        ]);
       }
     } catch (e) {
-      console.error('Error clearing cache:', e);
+      console.error('Error clearing cache & syncing:', e);
     }
+
+    setIsUpdating(false);
+    setSyncSuccessToast(true);
 
     setTimeout(() => {
       window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
-    }, 400);
+    }, 500);
   };
 
   return (
@@ -114,10 +128,14 @@ export default function Navbar() {
           onClick={handleSyncUpdates}
           disabled={isUpdating}
           className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950 transition-all cursor-pointer active:scale-95"
-          title="Sync Latest System Updates & Clear Mobile Cache"
+          title="Sync Live Cloud Data from Supabase & Purge Stale Mobile Cache"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
-          <span className="text-[11px] sm:text-xs">{isUpdating ? 'Syncing...' : 'Sync Update'}</span>
+          {syncSuccessToast ? (
+            <Check className="w-3.5 h-3.5 text-white" />
+          ) : (
+            <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+          )}
+          <span className="text-[11px] sm:text-xs">{isUpdating ? 'Syncing...' : syncSuccessToast ? 'Synced!' : 'Sync Update'}</span>
         </button>
 
         <button

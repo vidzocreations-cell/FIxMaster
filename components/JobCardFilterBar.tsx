@@ -49,12 +49,11 @@ export default function JobCardFilterBar({
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   const tabs = [
-    { key: 'All', label: 'All Jobs', count: counts.all, color: 'bg-slate-700 text-slate-200' },
+    { key: 'All', label: 'All Active Jobs', count: counts.all, color: 'bg-slate-700 text-slate-200' },
     { key: 'Pending', label: 'Pending', count: counts.pending, color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
     { key: 'In Progress', label: 'In Progress', count: counts.inProgress, color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
     { key: 'Completed', label: 'Completed', count: counts.completed, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
     { key: 'OverduePickup', label: '⚠️ Overdue Unpaid (ප්‍රමාද වූ)', count: counts.overduePickup, color: 'bg-red-500/30 text-red-300 border-red-500/60 font-bold animate-pulse' },
-    { key: 'Delivered', label: 'Delivered / Paid', count: counts.delivered, color: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
   ];
 
   return (
@@ -81,12 +80,11 @@ export default function JobCardFilterBar({
           onChange={(e) => setStatusTab(e.target.value)}
           className="w-full bg-slate-900 border border-cyan-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400 cursor-pointer shadow-md"
         >
-          <option value="All">📋 All Jobs ({counts.all})</option>
+          <option value="All">📋 All Active Jobs ({counts.all})</option>
           <option value="Pending">⏳ Pending ({counts.pending})</option>
           <option value="In Progress">⚡ In Progress ({counts.inProgress})</option>
           <option value="Completed">✅ Completed ({counts.completed})</option>
           <option value="OverduePickup">⚠️ Overdue Unpaid ({counts.overduePickup})</option>
-          <option value="Delivered">📦 Delivered / Paid ({counts.delivered})</option>
         </select>
       </div>
 

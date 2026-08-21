@@ -55,7 +55,7 @@ export default function JobsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdateStatus = (jobId: string, newStatus: JobStatus) => {
+  const handleUpdateStatus = async (jobId: string, newStatus: JobStatus) => {
     const updated = jobs.map((j) => {
       if (j.id === jobId) {
         return {
@@ -66,7 +66,7 @@ export default function JobsPage() {
       }
       return j;
     });
-    saveStoredJobs(updated);
+    await saveStoredJobs(updated);
     setJobs(updated);
   };
 
@@ -94,21 +94,22 @@ export default function JobsPage() {
     return diffDays >= 2;
   };
 
+  // Filter out Delivered/Paid jobs from Jobs Terminal (Delivered jobs go to POS / Sales)
+  const activeJobs = jobs.filter((j) => j.status !== 'Delivered');
+
   const counts = {
-    all: jobs.length,
-    pending: jobs.filter((j) => j.status === 'Pending').length,
-    inProgress: jobs.filter((j) => j.status === 'In Progress').length,
-    completed: jobs.filter((j) => j.status === 'Completed').length,
+    all: activeJobs.length,
+    pending: activeJobs.filter((j) => j.status === 'Pending').length,
+    inProgress: activeJobs.filter((j) => j.status === 'In Progress').length,
+    completed: activeJobs.filter((j) => j.status === 'Completed').length,
     delivered: jobs.filter((j) => j.status === 'Delivered').length,
-    overduePickup: jobs.filter(isOverduePickup).length,
+    overduePickup: activeJobs.filter(isOverduePickup).length,
   };
 
-  const filteredJobs = jobs.filter((job) => {
+  const filteredJobs = activeJobs.filter((job) => {
     if (statusTab !== 'All') {
       if (statusTab === 'OverduePickup') {
         if (!isOverduePickup(job)) return false;
-      } else if (statusTab === 'Delivered') {
-        if (job.status !== 'Delivered') return false;
       } else if (job.status !== statusTab) {
         return false;
       }
@@ -165,7 +166,7 @@ export default function JobsPage() {
               <Wrench className="w-6 h-6 text-cyan-400" /> Repair Job Cards Terminal
             </h1>
             <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-              Unlimited ({jobs.length} Total Jobs)
+              Active Repairs ({activeJobs.length})
             </span>
             {isCloudSyncing && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center gap-1">
@@ -173,7 +174,7 @@ export default function JobsPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">Track equipment repairs, assign spare parts, switch view layouts & notify customers</p>
+          <p className="text-xs text-slate-400">Track active equipment repairs (Delivered & Paid jobs automatically move to POS / Sales History)</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -225,7 +226,7 @@ export default function JobsPage() {
       {/* Counter & View Mode Switcher Controls Bar */}
       <div className="flex items-center justify-between text-xs text-slate-400 font-semibold px-1 py-1 bg-slate-900/40 rounded-xl border border-slate-800/80 px-3">
         <div className="flex items-center gap-3">
-          <span>Displaying {filteredJobs.length} of {jobs.length} Job Cards</span>
+          <span>Displaying {filteredJobs.length} of {activeJobs.length} Active Job Cards</span>
           {(statusTab !== 'All' || categoryFilter !== 'All' || datePreset !== 'all' || searchQuery) && (
             <button
               onClick={handleResetFilters}
@@ -272,7 +273,7 @@ export default function JobsPage() {
           {filteredJobs.length === 0 ? (
             <div className="col-span-full glass-panel rounded-2xl border border-slate-800 p-12 text-center text-slate-500 italic space-y-2">
               <Wrench className="w-8 h-8 text-slate-600 mx-auto" />
-              <p>No job cards found matching your date, category, or search filters.</p>
+              <p>No active job cards found matching your date, category, or search filters.</p>
               <button
                 onClick={handleResetFilters}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 inline-block cursor-pointer mt-2"
@@ -328,7 +329,7 @@ export default function JobsPage() {
                       <option value="Pending">Pending</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Completed">Completed (Ready for POS)</option>
-                      {job.status === 'Delivered' && <option value="Delivered">Delivered / Paid</option>}
+                      <option value="Delivered">Delivered / Paid (Move to POS & Sales)</option>
                     </select>
                   </div>
 
@@ -436,7 +437,7 @@ export default function JobsPage() {
                 {filteredJobs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-slate-500 italic">
-                      No job cards found matching your date, category, or search filters.
+                      No active job cards found matching your date, category, or search filters.
                     </td>
                   </tr>
                 ) : (
@@ -491,7 +492,7 @@ export default function JobsPage() {
                             <option value="Pending">Pending</option>
                             <option value="In Progress">In Progress</option>
                             <option value="Completed">Completed (Ready for POS)</option>
-                            {job.status === 'Delivered' && <option value="Delivered">Delivered / Paid</option>}
+                            <option value="Delivered">Delivered / Paid (Move to POS & Sales)</option>
                           </select>
                         </td>
 
