@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician } from '@/lib/types';
 import { getStoredJobs, saveStoredJobs, getStoredTechnicians, generateNextJobNo } from '@/lib/supabase';
+import OutsideBillScanner from '@/components/OutsideBillScanner';
 
 interface JobCardModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [extCostPrice, setExtCostPrice] = useState<number | ''>('');
   const [extMarginPercent, setExtMarginPercent] = useState<number | ''>(30);
   const [extSellingPrice, setExtSellingPrice] = useState<number | ''>('');
+  const [billImageUri, setBillImageUri] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setMounted(true);
@@ -89,6 +91,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setExtCostPrice('');
       setExtMarginPercent(30);
       setExtSellingPrice('');
+      setBillImageUri(undefined);
     }
   }, [jobToEdit, isOpen]);
 
@@ -124,6 +127,20 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     }
   };
 
+  const handleBillScanned = (scannedData: {
+    shopName?: string;
+    partName?: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    billImageUri?: string;
+  }) => {
+    if (scannedData.shopName) setExtShopName(scannedData.shopName);
+    if (scannedData.partName) setExtPartName(scannedData.partName);
+    if (scannedData.costPrice) handleExtCostChange(scannedData.costPrice);
+    if (scannedData.sellingPrice) handleExtSellingPriceChange(scannedData.sellingPrice);
+    if (scannedData.billImageUri) setBillImageUri(scannedData.billImageUri);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const jobs = getStoredJobs();
@@ -154,7 +171,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               vendor_name: extShopName || 'Outside Shop',
               warranty_days: 30,
             };
-            // Prevent duplicate external part adding if already exists
             const existsIndex = updatedParts.findIndex(p => p.is_external && p.part_name.startsWith(extPartName));
             if (existsIndex >= 0) {
               updatedParts[existsIndex] = extJobPart;
@@ -401,6 +417,9 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
             {hasExternalParts && (
               <div className="space-y-3 pt-2 border-amber-900/40 text-xs animate-in fade-in duration-200 border-t">
+                {/* Embedded Bill Scanner & Camera Upload Tool */}
+                <OutsideBillScanner onBillScanned={handleBillScanned} />
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Outside Shop Name (පිට කඩේ නම)</label>
