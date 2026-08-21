@@ -260,7 +260,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-150 p-0 sm:p-6 flex items-start sm:items-center justify-center min-h-screen">
+    <div className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/95 animate-in fade-in duration-150 p-0 sm:p-6 flex items-start sm:items-center justify-center min-h-screen">
       <div className="w-full max-w-xl bg-slate-900 sm:rounded-2xl border-0 sm:border border-slate-800 p-4 sm:p-6 space-y-4 shadow-2xl relative min-h-screen sm:min-h-0 sm:my-auto sm:max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-40 pt-2 sm:pt-0">
           <div className="flex items-center gap-2">
