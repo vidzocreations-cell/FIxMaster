@@ -102,95 +102,14 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  // Dynamic DOM Input Attached to document.body outside form context
-  const triggerDirectCameraApp = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.capture = 'environment';
-      input.style.position = 'fixed';
-      input.style.top = '-9999px';
-      input.style.left = '-9999px';
-      input.style.opacity = '0';
-      document.body.appendChild(input);
-
-      input.onchange = (evt: any) => {
-        const file = evt.target?.files?.[0];
-        if (file) {
-          processImageFile(file);
-        }
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
-        }
-      };
-
-      input.click();
-
-      setTimeout(() => {
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
-        }
-      }, 60000);
-    } catch (err) {
-      console.error('Dynamic camera trigger error:', err);
-    }
-  };
-
-  const triggerDirectGalleryApp = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.position = 'fixed';
-      input.style.top = '-9999px';
-      input.style.left = '-9999px';
-      input.style.opacity = '0';
-      document.body.appendChild(input);
-
-      input.onchange = (evt: any) => {
-        const file = evt.target?.files?.[0];
-        if (file) {
-          processImageFile(file);
-        }
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
-        }
-      };
-
-      input.click();
-
-      setTimeout(() => {
-        if (document.body.contains(input)) {
-          document.body.removeChild(input);
-        }
-      }, 60000);
-    } catch (err) {
-      console.error('Dynamic gallery trigger error:', err);
-    }
-  };
-
   // Trigger System Camera Access Permission Prompt for Live Viewfinder
-  const requestCameraPermission = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const requestCameraPermission = async () => {
     setPermissionError(null);
     setShowSettingsGuide(false);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        triggerDirectCameraApp();
-        return;
+        throw new Error('Camera hardware API not supported on this browser context.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -270,53 +189,33 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         )}
       </div>
 
-      {/* 
-        3-WAY FAILPROOF CAMERA & PHOTO BUTTON SUITE (with e.preventDefault to prevent form validation locks!)
-      */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Standalone Camera Launch Button */}
-        <button
-          type="button"
-          onClick={triggerDirectCameraApp}
-          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
-        >
-          <Camera className="w-4 h-4 text-slate-950" />
-          <span>📷 Snap Bill Photo</span>
-        </button>
-
-        {/* Button 2: Smart OCR Live Scanner */}
-        <button
-          type="button"
-          onClick={requestCameraPermission}
-          className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
-        >
-          <Scan className="w-4 h-4 text-cyan-200" />
-          <span>🔍 Live Viewfinder Camera</span>
-        </button>
-
-        {/* Button 3: Standalone Gallery Upload Button */}
-        <button
-          type="button"
-          onClick={triggerDirectGalleryApp}
-          className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
-        >
-          <Upload className="w-4 h-4 text-amber-400" />
-          <span>📁 Gallery Upload</span>
-        </button>
-      </div>
-
-      {/* Direct Native HTML File Input Control (Detached from form validation) */}
-      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-        <label className="block text-[11px] font-semibold text-slate-400">
-          Or select file directly via browser native input:
+      {/* Standard Failproof Mobile File & Camera Selector Input */}
+      <div className="p-3 rounded-xl bg-slate-900 border border-amber-800/80 space-y-2">
+        <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
+          <Camera className="w-4 h-4 text-amber-400" />
+          <span>📷 Select Paper Bill Photo / Take Photo:</span>
         </label>
         <input
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFileChange}
-          className="w-full text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-amber-300 hover:file:bg-slate-700 cursor-pointer"
+          className="w-full text-xs text-slate-200 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-gradient-to-r file:from-amber-400 file:to-amber-500 file:text-slate-950 hover:file:from-amber-300 hover:file:to-amber-400 cursor-pointer"
         />
+        <p className="text-[10px] text-slate-400 italic">
+          💡 "Choose File" touch කළ විට Android/iPhone මගින් <b>Camera</b> හෝ <b>Files/Gallery</b> තෝරාගැනීමට අවස්ථාව ලබාදෙයි.
+        </p>
+      </div>
+
+      {/* Secondary Action Buttons for In-App Live Camera */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={requestCameraPermission}
+          className="w-full py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 shadow-md shadow-cyan-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center"
+        >
+          <Scan className="w-4 h-4 text-cyan-200" />
+          <span>🔍 Live Screen Viewfinder Camera</span>
+        </button>
       </div>
 
       {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
