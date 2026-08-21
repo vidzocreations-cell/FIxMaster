@@ -143,6 +143,13 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Manual JS validation so HTML5 form validation doesn't block camera touch events
+    if (!customerName.trim() || !phoneNumber.trim() || !brandModel.trim() || !reportedFault.trim()) {
+      alert('Please fill in Customer Name, Phone Number, Machine Brand & Model, and Reported Fault.');
+      return;
+    }
+
     const jobs = getStoredJobs();
 
     const costNum = Number(extCostPrice) || 0;
@@ -278,7 +285,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pb-12 sm:pb-0">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 pb-12 sm:pb-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer Name */}
             <div>
@@ -287,7 +294,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  required
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Kamal Perera"
@@ -303,7 +309,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="e.g. 0771234567"
@@ -321,7 +326,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
                 <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
                 <input
                   type="text"
-                  required
                   list="job-equipment-categories-list"
                   value={machineCategory}
                   onChange={(e) => setMachineCategory(e.target.value)}
@@ -341,7 +345,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               <label className="block text-xs font-semibold text-slate-300 mb-1">Brand & Model No. *</label>
               <input
                 type="text"
-                required
                 value={brandModel}
                 onChange={(e) => setBrandModel(e.target.value)}
                 placeholder="e.g. Stihl MS180 / Makita GA4030"
@@ -390,7 +393,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
             <div className="relative">
               <AlertCircle className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               <textarea
-                required
                 rows={2}
                 value={reportedFault}
                 onChange={(e) => setReportedFault(e.target.value)}

@@ -102,8 +102,12 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  // Dynamic DOM Input Attached to document.body (Bypasses Android Chrome un-attached element security block!)
-  const triggerDirectCameraApp = () => {
+  // Dynamic DOM Input Attached to document.body outside form context
+  const triggerDirectCameraApp = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       const input = document.createElement('input');
       input.type = 'file';
@@ -115,8 +119,8 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       input.style.opacity = '0';
       document.body.appendChild(input);
 
-      input.onchange = (e: any) => {
-        const file = e.target?.files?.[0];
+      input.onchange = (evt: any) => {
+        const file = evt.target?.files?.[0];
         if (file) {
           processImageFile(file);
         }
@@ -125,10 +129,8 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         }
       };
 
-      // Dispatch click event directly
       input.click();
 
-      // Cleanup fallback
       setTimeout(() => {
         if (document.body.contains(input)) {
           document.body.removeChild(input);
@@ -139,7 +141,11 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  const triggerDirectGalleryApp = () => {
+  const triggerDirectGalleryApp = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       const input = document.createElement('input');
       input.type = 'file';
@@ -150,8 +156,8 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       input.style.opacity = '0';
       document.body.appendChild(input);
 
-      input.onchange = (e: any) => {
-        const file = e.target?.files?.[0];
+      input.onchange = (evt: any) => {
+        const file = evt.target?.files?.[0];
         if (file) {
           processImageFile(file);
         }
@@ -173,13 +179,16 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
   };
 
   // Trigger System Camera Access Permission Prompt for Live Viewfinder
-  const requestCameraPermission = async () => {
+  const requestCameraPermission = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setPermissionError(null);
     setShowSettingsGuide(false);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        // Fallback to direct camera app if getUserMedia is unavailable
         triggerDirectCameraApp();
         return;
       }
@@ -262,10 +271,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       </div>
 
       {/* 
-        3-WAY FAILPROOF CAMERA & PHOTO BUTTON SUITE:
-        1. Dynamic Attached DOM Input Trigger (appended to document.body)
-        2. Live In-App Camera Viewfinder
-        3. Native File Picker Control
+        3-WAY FAILPROOF CAMERA & PHOTO BUTTON SUITE (with e.preventDefault to prevent form validation locks!)
       */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {/* Button 1: Standalone Camera Launch Button */}
@@ -299,7 +305,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         </button>
       </div>
 
-      {/* Direct Native HTML File Input Control */}
+      {/* Direct Native HTML File Input Control (Detached from form validation) */}
       <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
         <label className="block text-[11px] font-semibold text-slate-400">
           Or select file directly via browser native input:
