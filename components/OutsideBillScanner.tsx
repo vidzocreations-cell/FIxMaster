@@ -190,23 +190,24 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
         )}
       </div>
 
-      {/* Action Buttons: 
-          1. System Camera / Intent Chooser (Universal Failproof Native Photo Capture)
-          2. Live In-App Camera Stream
-          3. Upload Photo from Gallery
+      {/* 
+        Action Buttons:
+        Each file input occupies the full button bounding box with opacity-0 (sr-only overlay).
+        This guarantees 100% direct native C++ browser touch dispatch without display:none skipping!
       */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Button 1: Universal Native Camera Choice (Triggers Android Native Intent Chooser: Camera / Photos) */}
-        <label className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
+        {/* Button 1: Direct Hardware Camera Input (Directly Overlaid Input) */}
+        <div className="relative py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center overflow-hidden">
           <Camera className="w-4 h-4 text-slate-950" />
-          <span>📷 Take Bill Photo (Camera)</span>
+          <span>📷 Snap Bill Photo</span>
           <input
             type="file"
-            accept="image/*,image/heic,image/heif"
+            accept="image/*"
+            capture="environment"
             onChange={handleFileChange}
-            className="hidden"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           />
-        </label>
+        </div>
 
         {/* Button 2: Smart OCR Live Scanner */}
         <button
@@ -218,17 +219,17 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
           <span>🔍 Live Smart OCR Scan</span>
         </button>
 
-        {/* Button 3: Upload Photo */}
-        <label className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center">
+        {/* Button 3: Upload Photo from Gallery (Directly Overlaid Input) */}
+        <div className="relative py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 text-center overflow-hidden">
           <Upload className="w-4 h-4 text-amber-400" />
           <span>📁 Gallery Upload</span>
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="hidden"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           />
-        </label>
+        </div>
       </div>
 
       {/* Mobile OS & Browser Settings Permission Guide Box (If blocked in settings) */}
@@ -279,15 +280,15 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
             </button>
 
             {/* Direct Native Camera Intent Chooser Fallback */}
-            <label className="py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
+            <div className="relative py-2 px-3 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer overflow-hidden">
               <Camera className="w-3.5 h-3.5 text-amber-400" /> Open Photo Intent
               <input
                 type="file"
-                accept="image/*,image/heic,image/heif"
+                accept="image/*"
                 onChange={handleFileChange}
-                className="hidden"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
-            </label>
+            </div>
           </div>
         </div>
       )}
