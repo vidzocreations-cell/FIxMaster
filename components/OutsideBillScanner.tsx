@@ -102,20 +102,38 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
     }
   };
 
-  // Dynamic Standalone DOM Input Launch (Bypasses React Modal Event Trapping!)
+  // Dynamic DOM Input Attached to document.body (Bypasses Android Chrome un-attached element security block!)
   const triggerDirectCameraApp = () => {
     try {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
       input.capture = 'environment';
+      input.style.position = 'fixed';
+      input.style.top = '-9999px';
+      input.style.left = '-9999px';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+
       input.onchange = (e: any) => {
         const file = e.target?.files?.[0];
         if (file) {
           processImageFile(file);
         }
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+        }
       };
+
+      // Dispatch click event directly
       input.click();
+
+      // Cleanup fallback
+      setTimeout(() => {
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+        }
+      }, 60000);
     } catch (err) {
       console.error('Dynamic camera trigger error:', err);
     }
@@ -126,13 +144,29 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
+      input.style.position = 'fixed';
+      input.style.top = '-9999px';
+      input.style.left = '-9999px';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+
       input.onchange = (e: any) => {
         const file = e.target?.files?.[0];
         if (file) {
           processImageFile(file);
         }
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+        }
       };
+
       input.click();
+
+      setTimeout(() => {
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+        }
+      }, 60000);
     } catch (err) {
       console.error('Dynamic gallery trigger error:', err);
     }
@@ -145,7 +179,9 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera hardware API not supported on this browser context.');
+        // Fallback to direct camera app if getUserMedia is unavailable
+        triggerDirectCameraApp();
+        return;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -227,7 +263,7 @@ export default function OutsideBillScanner({ onBillScanned }: OutsideBillScanner
 
       {/* 
         3-WAY FAILPROOF CAMERA & PHOTO BUTTON SUITE:
-        1. Dynamic Standalone Camera App Trigger (bypasses modal event traps)
+        1. Dynamic Attached DOM Input Trigger (appended to document.body)
         2. Live In-App Camera Viewfinder
         3. Native File Picker Control
       */}
