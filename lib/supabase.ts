@@ -197,6 +197,19 @@ export function generateNextInvoiceNo(existingInvoices?: Invoice[]): string {
 // Auto-creates an Invoice when a job status is updated to 'Delivered' / Paid
 export async function ensureInvoiceForDeliveredJob(job: JobCard) {
   if (job.status !== 'Delivered') return;
+
+  // Respect sales reset timestamp to prevent old delivered jobs from re-creating invoices
+  if (typeof window !== 'undefined') {
+    const resetTs = localStorage.getItem('fixmaster_sales_reset_timestamp');
+    if (resetTs) {
+      const resetTime = parseInt(resetTs, 10);
+      const jobTime = new Date(job.updated_at || job.created_at).getTime();
+      if (jobTime < resetTime) {
+        return;
+      }
+    }
+  }
+
   const existingInvoices = getStoredInvoices();
   const alreadyHasInvoice = existingInvoices.some(
     (inv) => inv.job_card_id === job.id || (job.job_no && inv.invoice_no.endsWith(job.job_no.replace('JOB-', '')))
@@ -225,6 +238,22 @@ export async function ensureInvoiceForDeliveredJob(job: JobCard) {
     };
 
     await saveStoredInvoices([newInvoice, ...existingInvoices]);
+  }
+}
+
+export async function clearAllSalesHistory() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_invoices', JSON.stringify([]));
+    localStorage.setItem('fixmaster_sales_reset_timestamp', Date.now().toString());
+  }
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('invoices').delete().neq('invoice_no', 'SYS-KEEP-NONE');
+    } catch (e) {
+      console.error('Failed to clear invoices in Supabase:', e);
+    }
   }
 }
 

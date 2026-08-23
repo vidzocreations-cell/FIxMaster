@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter } from 'lucide-react';
-import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile } from '@/lib/supabase';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter, AlertTriangle } from 'lucide-react';
+import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile, clearAllSalesHistory } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 import InvoiceEditModal from '@/components/InvoiceEditModal';
@@ -48,6 +48,20 @@ export default function SalesHistoryPage() {
     if (confirm(`Are you sure you want to delete Invoice ${invoiceNo}? This action cannot be undone.`)) {
       await deleteStoredInvoice(invoiceId, invoiceNo);
       setInvoices((prev) => prev.filter((i) => i.id !== invoiceId && i.invoice_no !== invoiceNo));
+    }
+  };
+
+  const handleClearSalesHistory = async () => {
+    if (
+      confirm(
+        '⚠️ WARNING: Are you sure you want to clear ALL past sales history and reset total revenue to LKR 0? New sales will save fresh starting from today forward.'
+      )
+    ) {
+      setIsCloudSyncing(true);
+      await clearAllSalesHistory();
+      setInvoices([]);
+      setIsCloudSyncing(false);
+      alert('✓ Sales History has been reset to LKR 0! Future sales will be recorded fresh from today forward.');
     }
   };
 
@@ -114,7 +128,9 @@ export default function SalesHistoryPage() {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400">View past sales transactions, filter by date range, edit receipt details, reprint & share receipts via WhatsApp</p>
+          <p className="text-xs text-slate-400">
+            View past sales transactions, filter by date range, edit receipt details, reprint & share receipts via WhatsApp
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -131,6 +147,17 @@ export default function SalesHistoryPage() {
               LKR {totalSalesRevenue.toLocaleString()}
             </div>
           </div>
+
+          {/* Reset Sales History Button */}
+          <button
+            type="button"
+            onClick={handleClearSalesHistory}
+            className="py-3 px-3.5 rounded-2xl text-xs font-bold text-red-300 bg-red-950/80 hover:bg-red-900 border border-red-800 flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
+            title="Clear all past sales history and reset revenue to LKR 0 (fresh start from today)"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" />
+            <span>Reset History to 0</span>
+          </button>
         </div>
       </div>
 
@@ -138,142 +165,152 @@ export default function SalesHistoryPage() {
       <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Search Bar */}
-          <div className="md:col-span-5 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          <div className="md:col-span-4 relative">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by Invoice #, Customer Name, or Phone..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+              placeholder="Search by invoice no, customer name, phone..."
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
 
-          {/* Date Range Presets Dropdown */}
-          <div className="md:col-span-4 relative">
-            <Calendar className="w-4 h-4 text-cyan-400 absolute left-3 top-3 z-10" />
-            <select
-              value={datePreset}
-              onChange={(e) => setDatePreset(e.target.value as SalesDatePreset)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer font-semibold"
-            >
-              <option value="all">📅 All Dates Sales (සියලුම දින)</option>
-              <option value="today">☀️ Today Sales (අද දින)</option>
-              <option value="week">📆 This Week Sales (මෙම සතියේ)</option>
-              <option value="month">📅 This Month Sales (මෙම මාසයේ)</option>
-              <option value="custom">🔍 Custom Date Range (නියමිත දින)</option>
-            </select>
+          {/* Date Filter Quick Presets */}
+          <div className="md:col-span-5 flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto">
+            {(['all', 'today', 'week', 'month', 'custom'] as SalesDatePreset[]).map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setDatePreset(preset)}
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-all cursor-pointer ${
+                  datePreset === preset
+                    ? 'bg-cyan-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                {preset === 'all' ? 'All Time' : preset === 'today' ? 'Today' : preset === 'week' ? 'This Week' : preset === 'month' ? 'This Month' : 'Custom'}
+              </button>
+            ))}
           </div>
 
           {/* Reset Filters Button */}
-          <div className="md:col-span-3 flex items-center justify-end">
-            <button
-              onClick={handleResetFilters}
-              className="w-full md:w-auto px-3.5 py-2 rounded-xl text-xs text-slate-400 bg-slate-900 border border-slate-800 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
-            </button>
+          <div className="md:col-span-3 flex items-center justify-end gap-2">
+            {(searchQuery || datePreset !== 'all') && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Clear Filters
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Custom Date Pickers */}
+        {/* Custom Date Range Selection (Only when Custom preset is active) */}
         {datePreset === 'custom' && (
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800 text-xs animate-in fade-in duration-150">
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800/60 text-xs animate-in fade-in">
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">Start Date:</span>
+              <span className="text-slate-400 font-semibold">From Date:</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">End Date:</span>
+              <span className="text-slate-400 font-semibold">To Date:</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:border-cyan-500 focus:outline-none"
               />
             </div>
           </div>
         )}
       </div>
 
-      {/* Invoices Table */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
+      {/* Invoices List Table */}
+      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+            <thead className="bg-slate-900/90 text-slate-400 font-semibold text-[11px] border-b border-slate-800 uppercase tracking-wider">
               <tr>
-                <th className="p-3.5">Invoice #</th>
-                <th className="p-3.5">Date & Time</th>
-                <th className="p-3.5">Customer</th>
-                <th className="p-3.5">Payment Method</th>
-                <th className="p-3.5">Subtotal</th>
-                <th className="p-3.5">Discount</th>
-                <th className="p-3.5">Net Paid</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-4">Invoice No</th>
+                <th className="p-4">Customer Details</th>
+                <th className="p-4">Date & Time</th>
+                <th className="p-4 text-right">Net Paid</th>
+                <th className="p-4 text-center">Payment Method</th>
+                <th className="p-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500 italic">
-                    No sales invoices found matching your date or search filters.
+                  <td colSpan={6} className="p-12 text-center text-slate-500 italic space-y-2">
+                    <History className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="text-sm font-semibold text-slate-400">No Sales Transactions Recorded</p>
+                    <p className="text-xs text-slate-500">
+                      {invoices.length === 0
+                        ? 'Sales history is fresh starting from today! New sales from POS and Repair Jobs will save automatically.'
+                        : 'No invoices match your current search or date filter.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="p-3.5 font-mono font-bold text-cyan-400">{inv.invoice_no}</td>
-                    <td className="p-3.5 text-slate-400">{new Date(inv.created_at).toLocaleString()}</td>
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-200">{inv.customer_name}</div>
-                      <div className="text-[11px] text-slate-500">{inv.phone_number}</div>
+                  <tr key={inv.id} className="hover:bg-slate-900/40 transition-colors">
+                    <td className="p-4 font-mono font-bold text-cyan-400">{inv.invoice_no}</td>
+                    <td className="p-4">
+                      <div className="font-bold text-white">{inv.customer_name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{inv.phone_number}</div>
                     </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                    <td className="p-4 text-slate-400 font-mono text-[11px]">
+                      {new Date(inv.created_at).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="p-4 text-right font-mono font-extrabold text-emerald-400">
+                      LKR {inv.net_payable.toLocaleString()}
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800">
                         {inv.payment_method}
                       </span>
                     </td>
-                    <td className="p-3.5 font-mono">LKR {inv.subtotal.toLocaleString()}</td>
-                    <td className="p-3.5 font-mono text-red-400">
-                      {inv.discount > 0 ? `- LKR ${inv.discount.toLocaleString()}` : '-'}
-                    </td>
-                    <td className="p-3.5 font-mono font-bold text-emerald-400">
-                      LKR {inv.net_payable.toLocaleString()}
-                    </td>
-                    <td className="p-3.5 text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        {/* Edit Receipt Button */}
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
+                          type="button"
+                          onClick={() => setSelectedInvoice(inv)}
+                          className="p-1.5 rounded-lg text-cyan-400 hover:text-white bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800 transition-all cursor-pointer"
+                          title="Print Thermal Receipt"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <WhatsAppInvoiceButton invoice={inv} />
+                        <button
+                          type="button"
                           onClick={() => setEditingInvoice(inv)}
-                          className="p-1.5 rounded-lg text-cyan-400 hover:text-cyan-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
+                          className="p-1.5 rounded-lg text-amber-400 hover:text-white bg-amber-950/60 hover:bg-amber-900 border border-amber-800 transition-all cursor-pointer"
                           title="Edit Receipt Details"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-
-                        {/* Reprint Button */}
                         <button
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5 text-cyan-400" /> Reprint
-                        </button>
-
-                        {/* WhatsApp Invoice Receipt Sharing Button */}
-                        <WhatsAppInvoiceButton invoice={inv} />
-
-                        {/* Delete Invoice Button */}
-                        <button
+                          type="button"
                           onClick={() => handleDeleteInvoice(inv.id, inv.invoice_no)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-all cursor-pointer"
+                          className="p-1.5 rounded-lg text-red-400 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-800 transition-all cursor-pointer"
                           title="Delete Invoice"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -285,19 +322,25 @@ export default function SalesHistoryPage() {
         </div>
       </div>
 
-      <ThermalReceiptModal
-        isOpen={!!selectedInvoice}
-        onClose={() => setSelectedInvoice(null)}
-        invoice={selectedInvoice}
-        profile={profile}
-      />
+      {/* Thermal Receipt Print Modal */}
+      {selectedInvoice && (
+        <ThermalReceiptModal
+          isOpen={!!selectedInvoice}
+          invoice={selectedInvoice}
+          profile={profile}
+          onClose={() => setSelectedInvoice(null)}
+        />
+      )}
 
-      <InvoiceEditModal
-        isOpen={!!editingInvoice}
-        onClose={() => setEditingInvoice(null)}
-        invoiceToEdit={editingInvoice}
-        onSaved={loadInvoices}
-      />
+      {/* Invoice Edit Modal */}
+      {editingInvoice && (
+        <InvoiceEditModal
+          isOpen={!!editingInvoice}
+          invoiceToEdit={editingInvoice}
+          onClose={() => setEditingInvoice(null)}
+          onSaved={loadInvoices}
+        />
+      )}
     </div>
   );
 }
