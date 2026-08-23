@@ -287,6 +287,21 @@ export async function saveStoredJobs(jobs: JobCard[]) {
 }
 
 // Helper to calculate simple string hash
+// Helper to normalize phone numbers for strict deduplication
+export function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('94') && digits.length === 11) {
+    return '0' + digits.slice(2);
+  }
+  return digits;
+}
+
+export function normalizeCustomerName(name: string): string {
+  return name ? name.trim().toLowerCase().replace(/\s+/g, ' ') : '';
+}
+
+// Helper to calculate simple string hash
 function stringHash(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -310,22 +325,50 @@ export function getStoredCustomers(): Customer[] {
   }
 
   const jobs = getStoredJobs();
-  const map = new Map<string, Customer>();
+  const list: Customer[] = [];
+
+  const findCustomerIndex = (name: string, phone: string) => {
+    const normP = normalizePhone(phone);
+    const normN = normalizeCustomerName(name);
+    return list.findIndex((c) => {
+      const matchP = normP && normalizePhone(c.phone_number) === normP;
+      const matchN = normN && normalizeCustomerName(c.customer_name) === normN;
+      return matchP || matchN;
+    });
+  };
 
   // Populate from stored customers
   for (const c of stored) {
     if (c.customer_name && c.phone_number) {
-      const key = `${c.customer_name.trim().toLowerCase()}_${c.phone_number.trim()}`;
-      map.set(key, c);
+      const idx = findCustomerIndex(c.customer_name, c.phone_number);
+      if (idx >= 0) {
+        // Merge duplicate
+        list[idx] = {
+          ...list[idx],
+          visit_count: Math.max(list[idx].visit_count || 1, c.visit_count || 1),
+          last_visit: c.last_visit && c.last_visit > (list[idx].last_visit || '') ? c.last_visit : list[idx].last_visit,
+        };
+      } else {
+        list.push(c);
+      }
     }
   }
 
   // Aggregate from jobs
   for (const j of jobs) {
     if (j.customer_name && j.phone_number) {
-      const key = `${j.customer_name.trim().toLowerCase()}_${j.phone_number.trim()}`;
-      if (!map.has(key)) {
-        map.set(key, {
+      const idx = findCustomerIndex(j.customer_name, j.phone_number);
+      if (idx >= 0) {
+        const existing = list[idx];
+        existing.visit_count = (existing.visit_count || 1) + 1;
+        if (j.created_at && j.created_at > (existing.last_visit || '')) {
+          existing.last_visit = j.created_at;
+          existing.machine_category = j.machine_category || existing.machine_category;
+          existing.brand_model = j.brand_model || existing.brand_model;
+        }
+      } else {
+        const key = `${normalizeCustomerName(j.customer_name)}_${normalizePhone(j.phone_number)}`;
+        list.push({
           id: 'cust-' + stringHash(key),
           customer_name: j.customer_name.trim(),
           phone_number: j.phone_number.trim(),
@@ -335,19 +378,16 @@ export function getStoredCustomers(): Customer[] {
           last_visit: j.created_at || new Date().toISOString(),
           created_at: j.created_at || new Date().toISOString(),
         });
-      } else {
-        const existing = map.get(key)!;
-        existing.visit_count = (existing.visit_count || 1) + 1;
-        if (j.created_at && j.created_at > (existing.last_visit || '')) {
-          existing.last_visit = j.created_at;
-          existing.machine_category = j.machine_category || existing.machine_category;
-          existing.brand_model = j.brand_model || existing.brand_model;
-        }
       }
     }
   }
 
-  return Array.from(map.values());
+  // Persist cleaned deduplicated list back to local storage
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_customers', JSON.stringify(list));
+  }
+
+  return list;
 }
 
 export async function saveOrUpdateCustomer(data: {
@@ -360,11 +400,15 @@ export async function saveOrUpdateCustomer(data: {
 
   const nameClean = data.customer_name.trim();
   const phoneClean = data.phone_number.trim();
+  const normP = normalizePhone(phoneClean);
+  const normN = normalizeCustomerName(nameClean);
 
   const currentCustomers = getStoredCustomers();
-  const existingIndex = currentCustomers.findIndex(
-    (c) => c.customer_name.toLowerCase() === nameClean.toLowerCase() || c.phone_number === phoneClean
-  );
+  const existingIndex = currentCustomers.findIndex((c) => {
+    const matchP = normP && normalizePhone(c.phone_number) === normP;
+    const matchN = normN && normalizeCustomerName(c.customer_name) === normN;
+    return matchP || matchN;
+  });
 
   let updatedList: Customer[] = [];
   let targetCust: Customer;
