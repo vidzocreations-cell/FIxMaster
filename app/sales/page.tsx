@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter, AlertTriangle } from 'lucide-react';
+import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter, AlertTriangle, CheckSquare, Square } from 'lucide-react';
 import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile, clearAllSalesHistory } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
@@ -17,6 +17,7 @@ export default function SalesHistoryPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
@@ -48,6 +49,24 @@ export default function SalesHistoryPage() {
     if (confirm(`Are you sure you want to delete Invoice ${invoiceNo}? This action cannot be undone.`)) {
       await deleteStoredInvoice(invoiceId, invoiceNo);
       setInvoices((prev) => prev.filter((i) => i.id !== invoiceId && i.invoice_no !== invoiceNo));
+      setSelectedInvoiceIds((prev) => prev.filter((id) => id !== invoiceId));
+    }
+  };
+
+  const handleBulkDeleteInvoices = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    const count = selectedInvoiceIds.length;
+    if (confirm(`Are you sure you want to delete ${count} selected invoice(s) from Sales History? This action cannot be undone.`)) {
+      setIsCloudSyncing(true);
+      for (const id of selectedInvoiceIds) {
+        const inv = invoices.find((i) => i.id === id);
+        if (inv) {
+          await deleteStoredInvoice(inv.id, inv.invoice_no);
+        }
+      }
+      setInvoices((prev) => prev.filter((i) => !selectedInvoiceIds.includes(i.id)));
+      setSelectedInvoiceIds([]);
+      setIsCloudSyncing(false);
     }
   };
 
@@ -60,6 +79,7 @@ export default function SalesHistoryPage() {
       setIsCloudSyncing(true);
       await clearAllSalesHistory();
       setInvoices([]);
+      setSelectedInvoiceIds([]);
       setIsCloudSyncing(false);
       alert('✓ Sales History has been reset to LKR 0! Future sales will be recorded fresh from today forward.');
     }
@@ -108,6 +128,22 @@ export default function SalesHistoryPage() {
 
     return true;
   });
+
+  const isAllSelected = filteredInvoices.length > 0 && filteredInvoices.every((i) => selectedInvoiceIds.includes(i.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedInvoiceIds([]);
+    } else {
+      setSelectedInvoiceIds(filteredInvoices.map((i) => i.id));
+    }
+  };
+
+  const handleToggleSelectInvoice = (id: string) => {
+    setSelectedInvoiceIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   const totalSalesRevenue = invoices.reduce((acc, inv) => acc + inv.net_payable, 0);
   const filteredSalesRevenue = filteredInvoices.reduce((acc, inv) => acc + inv.net_payable, 0);
@@ -160,6 +196,32 @@ export default function SalesHistoryPage() {
           </button>
         </div>
       </div>
+
+      {/* Bulk Selection Action Bar */}
+      {selectedInvoiceIds.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-cyan-950/95 border border-cyan-500 text-cyan-200 text-xs flex items-center justify-between shadow-2xl animate-in fade-in sticky top-4 z-30">
+          <div className="flex items-center gap-2 font-bold text-white">
+            <CheckSquare className="w-4.5 h-4.5 text-cyan-400" />
+            <span>{selectedInvoiceIds.length} Invoice(s) Selected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedInvoiceIds([])}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 border border-slate-800"
+            >
+              Deselect All
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDeleteInvoices}
+              className="px-4 py-1.5 rounded-xl text-xs font-extrabold text-white bg-red-600 hover:bg-red-500 shadow-lg shadow-red-950 flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Trash2 className="w-4 h-4" /> Delete Selected ({selectedInvoiceIds.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Date Filter & Search Controls Bar */}
       <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
@@ -239,6 +301,14 @@ export default function SalesHistoryPage() {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900/90 text-slate-400 font-semibold text-[11px] border-b border-slate-800 uppercase tracking-wider">
               <tr>
+                <th className="p-4 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="rounded border-slate-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                  />
+                </th>
                 <th className="p-4">Invoice No</th>
                 <th className="p-4">Customer Details</th>
                 <th className="p-4">Date & Time</th>
@@ -250,7 +320,7 @@ export default function SalesHistoryPage() {
             <tbody className="divide-y divide-slate-800/60">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-slate-500 italic space-y-2">
+                  <td colSpan={7} className="p-12 text-center text-slate-500 italic space-y-2">
                     <History className="w-8 h-8 text-slate-600 mx-auto" />
                     <p className="text-sm font-semibold text-slate-400">No Sales Transactions Recorded</p>
                     <p className="text-xs text-slate-500">
@@ -261,61 +331,73 @@ export default function SalesHistoryPage() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="p-4 font-mono font-bold text-cyan-400">{inv.invoice_no}</td>
-                    <td className="p-4">
-                      <div className="font-bold text-white">{inv.customer_name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{inv.phone_number}</div>
-                    </td>
-                    <td className="p-4 text-slate-400 font-mono text-[11px]">
-                      {new Date(inv.created_at).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="p-4 text-right font-mono font-extrabold text-emerald-400">
-                      LKR {inv.net_payable.toLocaleString()}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800">
-                        {inv.payment_method}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="p-1.5 rounded-lg text-cyan-400 hover:text-white bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800 transition-all cursor-pointer"
-                          title="Print Thermal Receipt"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                        </button>
-                        <WhatsAppInvoiceButton invoice={inv} />
-                        <button
-                          type="button"
-                          onClick={() => setEditingInvoice(inv)}
-                          className="p-1.5 rounded-lg text-amber-400 hover:text-white bg-amber-950/60 hover:bg-amber-900 border border-amber-800 transition-all cursor-pointer"
-                          title="Edit Receipt Details"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteInvoice(inv.id, inv.invoice_no)}
-                          className="p-1.5 rounded-lg text-red-400 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-800 transition-all cursor-pointer"
-                          title="Delete Invoice"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredInvoices.map((inv) => {
+                  const isSelected = selectedInvoiceIds.includes(inv.id);
+
+                  return (
+                    <tr key={inv.id} className={`transition-colors ${isSelected ? 'bg-cyan-950/40' : 'hover:bg-slate-900/40'}`}>
+                      <td className="p-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectInvoice(inv.id)}
+                          className="rounded border-slate-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-4 font-mono font-bold text-cyan-400">{inv.invoice_no}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-white">{inv.customer_name}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{inv.phone_number}</div>
+                      </td>
+                      <td className="p-4 text-slate-400 font-mono text-[11px]">
+                        {new Date(inv.created_at).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="p-4 text-right font-mono font-extrabold text-emerald-400">
+                        LKR {inv.net_payable.toLocaleString()}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800">
+                          {inv.payment_method}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedInvoice(inv)}
+                            className="p-1.5 rounded-lg text-cyan-400 hover:text-white bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800 transition-all cursor-pointer"
+                            title="Print Thermal Receipt"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                          <WhatsAppInvoiceButton invoice={inv} />
+                          <button
+                            type="button"
+                            onClick={() => setEditingInvoice(inv)}
+                            className="p-1.5 rounded-lg text-amber-400 hover:text-white bg-amber-950/60 hover:bg-amber-900 border border-amber-800 transition-all cursor-pointer"
+                            title="Edit Receipt Details"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInvoice(inv.id, inv.invoice_no)}
+                            className="p-1.5 rounded-lg text-red-400 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-800 transition-all cursor-pointer"
+                            title="Delete Invoice"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
