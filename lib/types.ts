@@ -125,3 +125,14 @@ export interface BusinessProfile {
   receipt_footer_note?: string;
   receipt_terms?: string;
 }
+
+export interface Customer {
+  id: string;
+  customer_name: string;
+  phone_number: string;
+  machine_category?: string;
+  brand_model?: string;
+  visit_count?: number;
+  last_visit?: string;
+  created_at?: string;
+}

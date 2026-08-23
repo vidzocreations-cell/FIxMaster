@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { JobCard, Part, Invoice, BusinessProfile, Technician, JobPart } from './types';
+import { JobCard, Part, Invoice, BusinessProfile, Technician, JobPart, Customer } from './types';
 
 const HARDCODED_SUPABASE_URL = 'https://emvbsjturokhyjpeoiiv.supabase.co';
 const HARDCODED_SUPABASE_KEY = 'sb_publishable_TAPl-LypOTejP6u60giaxA_sk76E7d9';
@@ -270,6 +270,152 @@ export async function saveStoredJobs(jobs: JobCard[]) {
       } catch (e) {
         console.error('Failed to upsert job card to Supabase:', e);
       }
+    }
+  }
+
+  // Auto-save/update customer records in database
+  for (const j of cleanJobs) {
+    if (j.customer_name && j.phone_number) {
+      saveOrUpdateCustomer({
+        customer_name: j.customer_name,
+        phone_number: j.phone_number,
+        machine_category: j.machine_category,
+        brand_model: j.brand_model,
+      });
+    }
+  }
+}
+
+// Helper to calculate simple string hash
+function stringHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+export function getStoredCustomers(): Customer[] {
+  let stored: Customer[] = [];
+  if (typeof window !== 'undefined') {
+    const data = localStorage.getItem('fixmaster_customers');
+    if (data) {
+      try {
+        stored = JSON.parse(data);
+      } catch (e) {
+        console.error('Failed to parse stored customers:', e);
+      }
+    }
+  }
+
+  const jobs = getStoredJobs();
+  const map = new Map<string, Customer>();
+
+  // Populate from stored customers
+  for (const c of stored) {
+    if (c.customer_name && c.phone_number) {
+      const key = `${c.customer_name.trim().toLowerCase()}_${c.phone_number.trim()}`;
+      map.set(key, c);
+    }
+  }
+
+  // Aggregate from jobs
+  for (const j of jobs) {
+    if (j.customer_name && j.phone_number) {
+      const key = `${j.customer_name.trim().toLowerCase()}_${j.phone_number.trim()}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: 'cust-' + stringHash(key),
+          customer_name: j.customer_name.trim(),
+          phone_number: j.phone_number.trim(),
+          machine_category: j.machine_category,
+          brand_model: j.brand_model,
+          visit_count: 1,
+          last_visit: j.created_at || new Date().toISOString(),
+          created_at: j.created_at || new Date().toISOString(),
+        });
+      } else {
+        const existing = map.get(key)!;
+        existing.visit_count = (existing.visit_count || 1) + 1;
+        if (j.created_at && j.created_at > (existing.last_visit || '')) {
+          existing.last_visit = j.created_at;
+          existing.machine_category = j.machine_category || existing.machine_category;
+          existing.brand_model = j.brand_model || existing.brand_model;
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+export async function saveOrUpdateCustomer(data: {
+  customer_name: string;
+  phone_number: string;
+  machine_category?: string;
+  brand_model?: string;
+}) {
+  if (!data.customer_name || !data.phone_number) return;
+
+  const nameClean = data.customer_name.trim();
+  const phoneClean = data.phone_number.trim();
+
+  const currentCustomers = getStoredCustomers();
+  const existingIndex = currentCustomers.findIndex(
+    (c) => c.customer_name.toLowerCase() === nameClean.toLowerCase() || c.phone_number === phoneClean
+  );
+
+  let updatedList: Customer[] = [];
+  let targetCust: Customer;
+
+  if (existingIndex >= 0) {
+    const existing = currentCustomers[existingIndex];
+    targetCust = {
+      ...existing,
+      customer_name: nameClean,
+      phone_number: phoneClean,
+      machine_category: data.machine_category || existing.machine_category,
+      brand_model: data.brand_model || existing.brand_model,
+      visit_count: (existing.visit_count || 1) + 1,
+      last_visit: new Date().toISOString(),
+    };
+    currentCustomers[existingIndex] = targetCust;
+    updatedList = currentCustomers;
+  } else {
+    targetCust = {
+      id: 'cust-' + Date.now(),
+      customer_name: nameClean,
+      phone_number: phoneClean,
+      machine_category: data.machine_category,
+      brand_model: data.brand_model,
+      visit_count: 1,
+      last_visit: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+    updatedList = [targetCust, ...currentCustomers];
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fixmaster_customers', JSON.stringify(updatedList));
+  }
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('customers').upsert(
+        {
+          customer_name: targetCust.customer_name,
+          phone_number: targetCust.phone_number,
+          machine_category: targetCust.machine_category,
+          brand_model: targetCust.brand_model,
+          visit_count: targetCust.visit_count,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'phone_number' }
+      );
+    } catch (e) {
+      console.error('Supabase customer upsert error:', e);
     }
   }
 }

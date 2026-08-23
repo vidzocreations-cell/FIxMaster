@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent } from 'lucide-react';
-import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician } from '@/lib/types';
-import { getStoredJobs, saveStoredJobs, getStoredTechnicians, generateNextJobNo } from '@/lib/supabase';
+import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent, Sparkles, CheckCircle2 } from 'lucide-react';
+import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician, Customer } from '@/lib/types';
+import { getStoredJobs, saveStoredJobs, getStoredTechnicians, generateNextJobNo, getStoredCustomers, saveOrUpdateCustomer } from '@/lib/supabase';
 import OutsideBillScanner from '@/components/OutsideBillScanner';
 
 interface JobCardModalProps {
@@ -27,6 +27,10 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [assignedTechnician, setAssignedTechnician] = useState('');
   const [techniciansList, setTechniciansList] = useState<Technician[]>([]);
 
+  // Customer Database & Auto-Fill Suggestions
+  const [customersList, setCustomersList] = useState<Customer[]>([]);
+  const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
+
   // Outside Shop Parts Fields (පිට කඩෙන් ගෙනා කොටස්)
   const [hasExternalParts, setHasExternalParts] = useState(false);
   const [extShopName, setExtShopName] = useState('');
@@ -43,11 +47,15 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     if (techs.length > 0 && !assignedTechnician) {
       setAssignedTechnician(techs[0].name);
     }
+    const custs = getStoredCustomers();
+    setCustomersList(custs);
   }, [isOpen]);
 
   useEffect(() => {
     const techs = getStoredTechnicians().filter((t) => t.status === 'Active');
     setTechniciansList(techs);
+    const custs = getStoredCustomers();
+    setCustomersList(custs);
 
     if (jobToEdit) {
       setCustomerName(jobToEdit.customer_name);
@@ -94,6 +102,42 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setBillImageUri(undefined);
     }
   }, [jobToEdit, isOpen]);
+
+  // Real-Time Customer Auto-Fill Detection
+  useEffect(() => {
+    const nameTrim = customerName.trim();
+    const phoneTrim = phoneNumber.trim();
+
+    if (!nameTrim && !phoneTrim) {
+      setMatchedCustomer(null);
+      return;
+    }
+
+    const match = customersList.find((c) => {
+      const nameMatch = nameTrim.length >= 2 && c.customer_name.toLowerCase().includes(nameTrim.toLowerCase());
+      const phoneMatch = phoneTrim.length >= 3 && c.phone_number.includes(phoneTrim);
+      return nameMatch || phoneMatch;
+    });
+
+    if (match) {
+      // Don't prompt if already fully auto-filled
+      if (match.customer_name.toLowerCase() === nameTrim.toLowerCase() && match.phone_number === phoneTrim) {
+        setMatchedCustomer(null);
+      } else {
+        setMatchedCustomer(match);
+      }
+    } else {
+      setMatchedCustomer(null);
+    }
+  }, [customerName, phoneNumber, customersList]);
+
+  const applyCustomerAutoFill = (cust: Customer) => {
+    setCustomerName(cust.customer_name);
+    setPhoneNumber(cust.phone_number);
+    if (cust.machine_category) setMachineCategory(cust.machine_category);
+    if (cust.brand_model) setBrandModel(cust.brand_model);
+    setMatchedCustomer(null);
+  };
 
   if (!isOpen || !mounted) return null;
 
@@ -144,11 +188,18 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Manual JS validation so HTML5 form validation doesn't block camera touch events
     if (!customerName.trim() || !phoneNumber.trim() || !brandModel.trim() || !reportedFault.trim()) {
       alert('Please fill in Customer Name, Phone Number, Machine Brand & Model, and Reported Fault.');
       return;
     }
+
+    // Auto-save Customer to Database & LocalStorage
+    saveOrUpdateCustomer({
+      customer_name: customerName,
+      phone_number: phoneNumber,
+      machine_category: machineCategory,
+      brand_model: brandModel,
+    });
 
     const jobs = getStoredJobs();
 
@@ -286,34 +337,74 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 pb-12 sm:pb-0">
+          {/* Real-time Customer Auto-Fill Suggestion Banner */}
+          {matchedCustomer && (
+            <div className="p-3 rounded-xl bg-cyan-950/90 border border-cyan-600/80 text-cyan-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 animate-in fade-in shadow-lg shadow-cyan-950">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 animate-pulse" />
+                <div>
+                  <p className="font-bold text-white">
+                    Returning Customer Found: <span className="text-cyan-300">{matchedCustomer.customer_name}</span> ({matchedCustomer.phone_number})
+                  </p>
+                  <p className="text-[11px] text-slate-300">
+                    {matchedCustomer.brand_model ? `Last Machine: ${matchedCustomer.brand_model}` : 'Customer registered in database'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => applyCustomerAutoFill(matchedCustomer)}
+                className="w-full sm:w-auto py-1.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-teal-400 hover:from-cyan-300 hover:to-teal-300 shadow flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+              >
+                ⚡ Auto-Fill Customer Info
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Customer Name */}
+            {/* Customer Name Input with Datalist */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
                 <input
                   type="text"
+                  list="customer-names-list"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Kamal Perera"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  placeholder="Type name (e.g. Kamal Perera)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
                 />
+                <datalist id="customer-names-list">
+                  {customersList.map((c) => (
+                    <option key={c.id} value={c.customer_name}>
+                      {c.phone_number} {c.brand_model ? `(${c.brand_model})` : ''}
+                    </option>
+                  ))}
+                </datalist>
               </div>
             </div>
 
-            {/* Phone Number */}
+            {/* Phone Number Input with Datalist */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
               <div className="relative">
-                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
                 <input
                   type="text"
+                  list="customer-phones-list"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="e.g. 0771234567"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  placeholder="Type phone (e.g. 0771234567)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
                 />
+                <datalist id="customer-phones-list">
+                  {customersList.map((c) => (
+                    <option key={c.id} value={c.phone_number}>
+                      {c.customer_name} {c.brand_model ? `(${c.brand_model})` : ''}
+                    </option>
+                  ))}
+                </datalist>
               </div>
             </div>
           </div>
