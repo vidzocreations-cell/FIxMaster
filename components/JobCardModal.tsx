@@ -103,24 +103,23 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     }
   }, [jobToEdit, isOpen]);
 
-  // Real-Time Customer Auto-Fill Detection
+  // Real-Time Customer Auto-Fill Detection (Only triggers after 3+ characters are typed!)
   useEffect(() => {
     const nameTrim = customerName.trim();
     const phoneTrim = phoneNumber.trim();
 
-    if (!nameTrim && !phoneTrim) {
+    if (nameTrim.length < 3 && phoneTrim.length < 3) {
       setMatchedCustomer(null);
       return;
     }
 
     const match = customersList.find((c) => {
-      const nameMatch = nameTrim.length >= 2 && c.customer_name.toLowerCase().includes(nameTrim.toLowerCase());
+      const nameMatch = nameTrim.length >= 3 && c.customer_name.toLowerCase().includes(nameTrim.toLowerCase());
       const phoneMatch = phoneTrim.length >= 3 && c.phone_number.includes(phoneTrim);
       return nameMatch || phoneMatch;
     });
 
     if (match) {
-      // Don't prompt if already fully auto-filled
       if (match.customer_name.toLowerCase() === nameTrim.toLowerCase() && match.phone_number === phoneTrim) {
         setMatchedCustomer(null);
       } else {
@@ -337,7 +336,42 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 pb-12 sm:pb-0">
-          {/* Real-time Customer Auto-Fill Suggestion Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Customer Name Input (Clean, Uncluttered) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="e.g. Kamal Perera"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Phone Number Input (Clean, Uncluttered) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
+                <input
+                  type="text"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g. 0771234567"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 
+            Clean Non-Overlapping Auto-Fill Prompt 
+            (Only appears below input fields AFTER user types 3+ characters of a matching customer!)
+          */}
           {matchedCustomer && (
             <div className="p-3 rounded-xl bg-cyan-950/90 border border-cyan-600/80 text-cyan-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 animate-in fade-in shadow-lg shadow-cyan-950">
               <div className="flex items-center gap-2">
@@ -360,54 +394,6 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               </button>
             </div>
           )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Customer Name Input with Datalist */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <input
-                  type="text"
-                  list="customer-names-list"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Type name (e.g. Kamal Perera)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
-                />
-                <datalist id="customer-names-list">
-                  {customersList.map((c) => (
-                    <option key={c.id} value={c.customer_name}>
-                      {c.phone_number} {c.brand_model ? `(${c.brand_model})` : ''}
-                    </option>
-                  ))}
-                </datalist>
-              </div>
-            </div>
-
-            {/* Phone Number Input with Datalist */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <input
-                  type="text"
-                  list="customer-phones-list"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Type phone (e.g. 0771234567)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
-                />
-                <datalist id="customer-phones-list">
-                  {customersList.map((c) => (
-                    <option key={c.id} value={c.phone_number}>
-                      {c.customer_name} {c.brand_model ? `(${c.brand_model})` : ''}
-                    </option>
-                  ))}
-                </datalist>
-              </div>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Typeable / Searchable Equipment Category */}
