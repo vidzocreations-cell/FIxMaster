@@ -32,6 +32,9 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
+  // Custom Category Typeable Auto-Suggest State
+  const [categoryFocused, setCategoryFocused] = useState(false);
+
   // Outside Shop Parts Fields (පිට කඩෙන් ගෙනා කොටස්)
   const [hasExternalParts, setHasExternalParts] = useState(false);
   const [extShopName, setExtShopName] = useState('');
@@ -148,6 +151,11 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       applyCustomerAutoFill(found);
     }
   };
+
+  // Filter categories matching user input
+  const filteredCategories = EQUIPMENT_CATEGORIES.filter((cat) =>
+    cat.toLowerCase().includes(machineCategory.trim().toLowerCase())
+  );
 
   if (!isOpen || !mounted) return null;
 
@@ -435,22 +443,42 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Equipment Category / Type Dropdown (Standard Clean Select) */}
+            {/* Equipment Category / Type Field (Typeable Text Input + Clean Custom Auto-Suggest Dropdown) */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category / Type *</label>
               <div className="relative">
                 <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <select
+                <input
+                  type="text"
+                  autoComplete="off"
                   value={machineCategory}
                   onChange={(e) => setMachineCategory(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-semibold cursor-pointer"
-                >
-                  {EQUIPMENT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                  onFocus={() => setCategoryFocused(true)}
+                  onBlur={() => setTimeout(() => setCategoryFocused(false), 200)}
+                  placeholder="Type or select category (e.g. Chainsaws, Generator)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
+                />
+
+                {/* Clean Inline Custom Auto-Suggest Dropdown */}
+                {categoryFocused && filteredCategories.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50 p-1 divide-y divide-slate-800/60">
+                    {filteredCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setMachineCategory(cat);
+                          setCategoryFocused(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white hover:bg-cyan-950/80 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                      >
+                        <span>{cat}</span>
+                        <span className="text-[10px] text-cyan-400 font-normal">Select</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
