@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Wrench, User, Phone, Tag, AlertCircle, DollarSign, ExternalLink, Store, Percent, Sparkles, Search } from 'lucide-react';
 import { EQUIPMENT_CATEGORIES, JobCard, JobPart, Technician, Customer } from '@/lib/types';
 import { getStoredJobs, saveStoredJobs, getStoredTechnicians, generateNextJobNo, getStoredCustomers, saveOrUpdateCustomer } from '@/lib/supabase';
 import OutsideBillScanner from '@/components/OutsideBillScanner';
@@ -30,6 +30,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
   // Customer Database & Auto-Fill Suggestions
   const [customersList, setCustomersList] = useState<Customer[]>([]);
   const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
   // Outside Shop Parts Fields (පිට කඩෙන් ගෙනා කොටස්)
   const [hasExternalParts, setHasExternalParts] = useState(false);
@@ -100,22 +101,23 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
       setExtMarginPercent(30);
       setExtSellingPrice('');
       setBillImageUri(undefined);
+      setSelectedCustomerId('');
     }
   }, [jobToEdit, isOpen]);
 
-  // Real-Time Customer Auto-Fill Detection (Only triggers after 3+ characters are typed!)
+  // Real-Time Customer Auto-Fill Detection (Only triggers after 4+ characters are typed, without native popups!)
   useEffect(() => {
     const nameTrim = customerName.trim();
     const phoneTrim = phoneNumber.trim();
 
-    if (nameTrim.length < 3 && phoneTrim.length < 3) {
+    if (nameTrim.length < 4 && phoneTrim.length < 4) {
       setMatchedCustomer(null);
       return;
     }
 
     const match = customersList.find((c) => {
-      const nameMatch = nameTrim.length >= 3 && c.customer_name.toLowerCase().includes(nameTrim.toLowerCase());
-      const phoneMatch = phoneTrim.length >= 3 && c.phone_number.includes(phoneTrim);
+      const nameMatch = nameTrim.length >= 4 && c.customer_name.toLowerCase().includes(nameTrim.toLowerCase());
+      const phoneMatch = phoneTrim.length >= 4 && c.phone_number.includes(phoneTrim);
       return nameMatch || phoneMatch;
     });
 
@@ -136,6 +138,15 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
     if (cust.machine_category) setMachineCategory(cust.machine_category);
     if (cust.brand_model) setBrandModel(cust.brand_model);
     setMatchedCustomer(null);
+    setSelectedCustomerId(cust.id);
+  };
+
+  const handleSelectCustomerFromDropdown = (id: string) => {
+    setSelectedCustomerId(id);
+    const found = customersList.find((c) => c.id === id);
+    if (found) {
+      applyCustomerAutoFill(found);
+    }
   };
 
   if (!isOpen || !mounted) return null;
@@ -336,14 +347,40 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 pb-12 sm:pb-0">
+          {/* Optional Returning Customer Selector Dropdown */}
+          {customersList.length > 0 && (
+            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <label className="block text-[11px] font-semibold text-cyan-400 flex items-center gap-1">
+                <Search className="w-3.5 h-3.5 text-cyan-400" /> Select Existing Saved Customer (Optional):
+              </label>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => handleSelectCustomerFromDropdown(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                <option value="">-- Choose returning customer or type below --</option>
+                {customersList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.customer_name} ({c.phone_number}) {c.brand_model ? `- ${c.brand_model}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Customer Name Input (Clean, Uncluttered) */}
+            {/* Customer Name Input (100% Clean, NO datalists or popups) */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
                 <input
                   type="text"
+                  name="cust_full_name_clean"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="words"
+                  spellCheck={false}
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Kamal Perera"
@@ -352,13 +389,18 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               </div>
             </div>
 
-            {/* Phone Number Input (Clean, Uncluttered) */}
+            {/* Phone Number Input (100% Clean, NO datalists or popups) */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
                 <input
                   type="text"
+                  name="cust_phone_no_clean"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="e.g. 0771234567"
@@ -369,51 +411,46 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
           </div>
 
           {/* 
-            Clean Non-Overlapping Auto-Fill Prompt 
-            (Only appears below input fields AFTER user types 3+ characters of a matching customer!)
+            Subtle 1-Line Non-Overlapping Auto-Fill Prompt 
+            (Appears BELOW inputs ONLY when 4+ characters match an existing customer!)
           */}
           {matchedCustomer && (
-            <div className="p-3 rounded-xl bg-cyan-950/90 border border-cyan-600/80 text-cyan-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 animate-in fade-in shadow-lg shadow-cyan-950">
+            <div className="p-2.5 rounded-xl bg-cyan-950/90 border border-cyan-600/80 text-cyan-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 animate-in fade-in shadow-lg shadow-cyan-950">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 animate-pulse" />
                 <div>
                   <p className="font-bold text-white">
-                    Returning Customer Found: <span className="text-cyan-300">{matchedCustomer.customer_name}</span> ({matchedCustomer.phone_number})
-                  </p>
-                  <p className="text-[11px] text-slate-300">
-                    {matchedCustomer.brand_model ? `Last Machine: ${matchedCustomer.brand_model}` : 'Customer registered in database'}
+                    Matched: <span className="text-cyan-300">{matchedCustomer.customer_name}</span> ({matchedCustomer.phone_number})
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => applyCustomerAutoFill(matchedCustomer)}
-                className="w-full sm:w-auto py-1.5 px-3 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-teal-400 hover:from-cyan-300 hover:to-teal-300 shadow flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+                className="w-full sm:w-auto py-1 px-3 rounded-lg text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-teal-400 hover:from-cyan-300 hover:to-teal-300 shadow flex items-center justify-center gap-1 shrink-0 cursor-pointer active:scale-95"
               >
-                ⚡ Auto-Fill Customer Info
+                ⚡ Auto-Fill Details
               </button>
             </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Typeable / Searchable Equipment Category */}
+            {/* Equipment Category / Type Dropdown (Standard Clean Select) */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Equipment Category / Type *</label>
               <div className="relative">
                 <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 z-10" />
-                <input
-                  type="text"
-                  list="job-equipment-categories-list"
+                <select
                   value={machineCategory}
                   onChange={(e) => setMachineCategory(e.target.value)}
-                  placeholder="Type or select category (e.g. Chainsaws, Generator)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-semibold"
-                />
-                <datalist id="job-equipment-categories-list">
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-semibold cursor-pointer"
+                >
                   {EQUIPMENT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat} />
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
 
@@ -422,6 +459,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               <label className="block text-xs font-semibold text-slate-300 mb-1">Brand & Model No. *</label>
               <input
                 type="text"
+                autoComplete="off"
                 value={brandModel}
                 onChange={(e) => setBrandModel(e.target.value)}
                 placeholder="e.g. Stihl MS180 / Makita GA4030"
@@ -436,6 +474,7 @@ export default function JobCardModal({ isOpen, onClose, jobToEdit, onSaved }: Jo
               <label className="block text-xs font-semibold text-slate-300 mb-1">Machine Serial No. (Optional)</label>
               <input
                 type="text"
+                autoComplete="off"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="e.g. SN-883920"
