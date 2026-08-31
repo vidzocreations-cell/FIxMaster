@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, MessageSquare, Share2 } from 'lucide-react';
+import { X, Printer, MessageSquare, Share2, Copy, Check } from 'lucide-react';
 import { Invoice, JobCard, BusinessProfile, JobPart } from '@/lib/types';
 import { getStoredJobs } from '@/lib/supabase';
 
@@ -16,6 +16,7 @@ interface ThermalReceiptModalProps {
 
 export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard, profile }: ThermalReceiptModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,6 +27,25 @@ export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard,
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCopyText = () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(formattedBillText);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = formattedBillText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 3000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
   };
 
   // Find job card either directly or via stored jobs matching invoice
@@ -315,38 +335,56 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
         </div>
 
         {/* Action Controls (Screen Only) */}
-        <div className="no-print flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:text-white transition-all cursor-pointer"
-          >
-            Cancel
-          </button>
+        <div className="no-print space-y-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <a
+              href={whatsappDirectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(formattedBillText);
+                }
+              }}
+              className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50 transition-all cursor-pointer text-center decoration-0 active:scale-95"
+            >
+              <MessageSquare className="w-4 h-4 text-white" />
+              <span>Share WhatsApp</span>
+            </a>
 
-          {/* Direct HTML Hyperlink Button for WhatsApp - 100% Failproof */}
-          <a
-            href={whatsappDirectUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                navigator.clipboard.writeText(formattedBillText);
-              }
-            }}
-            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50 transition-all cursor-pointer text-center decoration-0 active:scale-95"
-          >
-            <MessageSquare className="w-4 h-4 text-white" />
-            <span>Share via WhatsApp</span>
-          </a>
+            <button
+              type="button"
+              onClick={handleCopyText}
+              className="py-2.5 px-3 rounded-xl text-xs font-extrabold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer active:scale-95"
+            >
+              {copiedText ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-cyan-400" />}
+              <span>{copiedText ? '✓ Copied!' : 'Copy Bill Text'}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4" /> Print Receipt
-          </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="col-span-2 sm:col-span-1 py-2.5 px-3 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-900/50 transition-all cursor-pointer active:scale-95"
+            >
+              <Printer className="w-4 h-4" /> Print Receipt
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80">
+            <button
+              type="button"
+              onClick={onClose}
+              className="py-1 px-3 rounded-lg text-slate-400 hover:text-white bg-slate-950 border border-slate-800 font-semibold cursor-pointer"
+            >
+              Close Modal
+            </button>
+            <a
+              href="/sales"
+              className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer text-xs"
+            >
+              View in Sales History ➔
+            </a>
+          </div>
         </div>
       </div>
     </div>

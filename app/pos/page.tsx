@@ -148,7 +148,7 @@ export default function POSPage() {
       origin: { y: 0.6 },
     });
 
-    // 4. Open Thermal Receipt Print Modal & Auto-redirect to Sales History
+    // 4. Open Thermal Receipt Print Modal & Keep Open for User Actions
     setLastInvoice(newInvoice);
     setIsReceiptOpen(true);
 
@@ -156,11 +156,6 @@ export default function POSPage() {
     setSelectedJob(null);
     setDiscount('');
     loadData();
-
-    // Auto-navigate to Sales History (/sales) page
-    setTimeout(() => {
-      router.push('/sales');
-    }, 1200);
   };
 
   const handleCheckoutBulkJobs = async () => {
@@ -222,10 +217,6 @@ export default function POSPage() {
     setBulkSelectedJobIds([]);
     setDiscount('');
     loadData();
-
-    setTimeout(() => {
-      router.push('/sales');
-    }, 1200);
   };
 
   const profile = getStoredProfile();
