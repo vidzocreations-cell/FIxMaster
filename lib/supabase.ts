@@ -233,9 +233,14 @@ export async function ensureInvoiceForDeliveredJob(job: JobCard) {
   }
 
   const existingInvoices = getStoredInvoices();
-  const alreadyHasInvoice = existingInvoices.some(
-    (inv) => inv.job_card_id === job.id || (job.job_no && inv.invoice_no.endsWith(job.job_no.replace('JOB-', '')))
-  );
+  const alreadyHasInvoice = existingInvoices.some((inv) => {
+    if (inv.job_card_id === job.id) return true;
+    if (inv.is_consolidated && inv.job_cards && inv.job_cards.some((j) => j.id === job.id || j.job_no === job.job_no)) {
+      return true;
+    }
+    if (job.job_no && inv.invoice_no.endsWith(job.job_no.replace('JOB-', ''))) return true;
+    return false;
+  });
 
   if (!alreadyHasInvoice) {
     const partsTotal = job.parts ? job.parts.reduce((a, b) => a + b.total_price, 0) : 0;
