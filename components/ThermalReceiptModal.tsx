@@ -147,7 +147,7 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
 
           {/* Machine Info / Multi-Job Consolidated Items */}
           {invoice?.is_consolidated && invoice?.job_cards && invoice.job_cards.length > 0 ? (
-            <div className="space-y-3 py-1">
+            <div className="space-y-4 py-1">
               <div className="p-1.5 bg-gray-200 font-extrabold text-[11px] text-center uppercase tracking-wider rounded border border-gray-400">
                 CONSOLIDATED MASTER BILL ({invoice.job_cards.length} MACHINES REPAIRED)
               </div>
@@ -156,34 +156,54 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
                 const jLabor = jCard.labor_charge || 0;
                 const jDeposit = jCard.advance_deposit || 0;
                 const jPartsSum = jParts.reduce((a, b) => a + b.total_price, 0);
+                const jMachineNet = Math.max(0, jPartsSum + jLabor - jDeposit);
 
                 return (
-                  <div key={jCard.id || jIdx} className="p-2 bg-gray-50 rounded border border-gray-300 text-[11px] space-y-1 text-black">
-                    <div className="flex justify-between font-extrabold border-b border-gray-300 pb-1">
+                  <div key={jCard.id || jIdx} className="p-2.5 bg-gray-50 rounded-lg border border-gray-400 text-[11px] space-y-1.5 text-black">
+                    <div className="flex justify-between font-black border-b border-black pb-1 text-[11px]">
                       <span>{jCard.job_no}: {jCard.machine_category}</span>
                       <span>{jCard.brand_model}</span>
                     </div>
-                    {jParts.length > 0 && (
-                      <div className="text-[10px] space-y-0.5 pt-0.5">
-                        <p className="font-bold text-gray-700">Parts Used:</p>
-                        {jParts.map((p, pIdx) => (
-                          <div key={pIdx} className="flex justify-between text-gray-800">
-                            <span>• {p.part_name} (x{p.quantity})</span>
-                            <span>{currencyStr} {p.total_price.toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex justify-between font-semibold text-[10px] text-gray-800 pt-0.5">
-                      <span>Labor Charge:</span>
-                      <span>{currencyStr} {jLabor.toLocaleString()}</span>
+
+                    <div className="text-[10px] space-y-0.5 text-gray-800">
+                      {jCard.serial_number && <p><span className="font-bold">S/N:</span> {jCard.serial_number}</p>}
+                      <p><span className="font-bold">Fault / Note:</span> {jCard.reported_fault}</p>
                     </div>
-                    {jDeposit > 0 && (
-                      <div className="flex justify-between text-[10px] font-bold text-gray-800">
-                        <span>Advance Deposit:</span>
-                        <span>- {currencyStr} {jDeposit.toLocaleString()}</span>
+
+                    {/* Machine Spare Parts List */}
+                    <div className="pt-1">
+                      <p className="font-bold text-[10px] uppercase tracking-wider text-black border-b border-gray-300 pb-0.5">Parts & Materials Used:</p>
+                      {jParts.length === 0 ? (
+                        <p className="text-[10px] text-gray-500 italic py-0.5">(No Spare Parts Charged)</p>
+                      ) : (
+                        <div className="divide-y divide-gray-200 text-[10px]">
+                          {jParts.map((p, pIdx) => (
+                            <div key={pIdx} className="flex justify-between py-0.5 text-black">
+                              <span>• {p.part_name} (x{p.quantity})</span>
+                              <span className="font-bold">{currencyStr} {p.total_price.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Machine Charges & Deposit */}
+                    <div className="border-t border-gray-300 pt-1 space-y-0.5 text-[10px]">
+                      <div className="flex justify-between font-semibold text-gray-800">
+                        <span>Service & Labor Charge:</span>
+                        <span>{currencyStr} {jLabor.toLocaleString()}</span>
                       </div>
-                    )}
+                      {jDeposit > 0 && (
+                        <div className="flex justify-between font-bold text-gray-900">
+                          <span>Advance Deposit Paid:</span>
+                          <span>- {currencyStr} {jDeposit.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-extrabold text-[11px] text-black border-t border-dashed border-gray-400 pt-0.5 mt-0.5">
+                        <span>Machine Total Net:</span>
+                        <span>{currencyStr} {jMachineNet.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
                 );
               })}

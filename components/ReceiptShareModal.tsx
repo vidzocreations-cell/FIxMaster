@@ -48,9 +48,27 @@ export default function ReceiptShareModal({ isOpen, onClose, invoice, jobCard, o
   const customerPhone = invoice?.phone_number || targetJob?.phone_number || '';
   const customerName = invoice?.customer_name || targetJob?.customer_name || 'Customer';
 
-  let partsText = parts.length > 0
+  const partsText = parts.length > 0
     ? parts.map((p) => `• ${p.part_name} (x${p.quantity}) - ${currencyStr} ${p.total_price.toLocaleString()}`).join('\n')
     : '(No Spare Parts Charged)';
+
+  let itemDetailsText = '';
+
+  if (invoice?.is_consolidated && invoice?.job_cards && invoice.job_cards.length > 0) {
+    itemDetailsText = `*REPAIRED MACHINES (${invoice.job_cards.length} UNITS):*\n\n` +
+      invoice.job_cards.map((jCard, idx) => {
+        const jParts = jCard.parts || [];
+        const jLabor = jCard.labor_charge || 0;
+        const jDeposit = jCard.advance_deposit || 0;
+        const pLines = jParts.length > 0
+          ? jParts.map((p) => `  • ${p.part_name} (x${p.quantity}) - ${currencyStr} ${p.total_price.toLocaleString()}`).join('\n')
+          : '  • (No Spare Parts Charged)';
+        
+        return `--- MACHINE #${idx + 1}: ${jCard.job_no} ---\nCategory : ${jCard.machine_category}\nModel    : ${jCard.brand_model}${jCard.serial_number ? `\nS/N      : ${jCard.serial_number}` : ''}\nFault    : ${jCard.reported_fault}\n*Parts & Labor Charges:*\n${pLines}\n  • Labor Charge: ${currencyStr} ${jLabor.toLocaleString()}${jDeposit > 0 ? `\n  • Advance Deposit: - ${currencyStr} ${jDeposit.toLocaleString()}` : ''}`;
+      }).join('\n\n');
+  } else {
+    itemDetailsText = `*ITEMS & REPAIR CHARGES:*\n${partsText}\n• Labor Charge: ${currencyStr} ${labor.toLocaleString()}${deposit > 0 ? `\n• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString()}` : ''}`;
+  }
 
   const formattedBillText = 
 `🧾 *${shopName.toUpperCase()}*
@@ -61,10 +79,9 @@ Doc No : ${docNo}
 Date   : ${createdDate.toLocaleDateString()} ${createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
 Cust   : ${customerName} (${customerPhone})
 ${invoice ? `Payment: ${invoice.payment_method}\n` : ''}----------------------------------
-*ITEMS & REPAIR CHARGES:*
-${partsText}
-• Labor Charge: ${currencyStr} ${labor.toLocaleString()}
-${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString()}\n` : ''}${discount > 0 ? `• Discount Allowed: - ${currencyStr} ${discount.toLocaleString()}\n` : ''}----------------------------------
+${itemDetailsText}
+${discount > 0 ? `\n• Discount Allowed: - ${currencyStr} ${discount.toLocaleString()}` : ''}
+----------------------------------
 *NET PAID: ${currencyStr} ${netPayable.toLocaleString()}*
 ----------------------------------
 *** THANK YOU FOR YOUR BUSINESS ***`;
