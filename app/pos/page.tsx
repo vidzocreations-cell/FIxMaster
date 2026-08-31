@@ -99,7 +99,6 @@ export default function POSPage() {
   };
 
   const handleCheckoutJob = async (jobToCheckout: JobCard) => {
-    // 1. Create Invoice
     const invoices = getStoredInvoices();
     const nextInvNo = generateNextInvoiceNo(invoices);
 
@@ -124,9 +123,13 @@ export default function POSPage() {
       job_card: jobToCheckout,
     };
 
-    await saveStoredInvoices([newInvoice, ...invoices]);
+    // Open Modal INSTANTLY (0ms)
+    setLastInvoice(newInvoice);
+    setIsReceiptOpen(true);
 
-    // 2. Mark Job Card status as Delivered / Paid
+    // Save to LocalStorage & Memory Cache (0ms non-blocking)
+    saveStoredInvoices([newInvoice, ...invoices]);
+
     const allJobs = getStoredJobs();
     const updatedJobs = allJobs.map((j) => {
       if (j.id === jobToCheckout.id) {
@@ -139,23 +142,20 @@ export default function POSPage() {
       return j;
     });
 
-    await saveStoredJobs(updatedJobs);
+    saveStoredJobs(updatedJobs);
 
-    // 3. Trigger Confetti
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+    // Trigger Confetti
+    try {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    } catch {}
 
-    // 4. Open Thermal Receipt Print Modal & Keep Open for User Actions
-    setLastInvoice(newInvoice);
-    setIsReceiptOpen(true);
-
-    // Reset state & reload
+    // Reset selection state
     setSelectedJob(null);
     setDiscount('');
-    loadData();
   };
 
   const handleCheckoutBulkJobs = async () => {
@@ -186,9 +186,13 @@ export default function POSPage() {
       is_consolidated: true,
     };
 
-    await saveStoredInvoices([newInvoice, ...invoices]);
+    // Open Modal INSTANTLY (0ms)
+    setLastInvoice(newInvoice);
+    setIsReceiptOpen(true);
 
-    // Mark all included jobs as Delivered / Paid
+    // Save to LocalStorage & Memory Cache (0ms non-blocking)
+    saveStoredInvoices([newInvoice, ...invoices]);
+
     const allJobs = getStoredJobs();
     const bulkIds = bulkSelectedJobsList.map((j) => j.id);
     const updatedJobs = allJobs.map((j) => {
@@ -202,21 +206,19 @@ export default function POSPage() {
       return j;
     });
 
-    await saveStoredJobs(updatedJobs);
+    saveStoredJobs(updatedJobs);
 
     // Trigger Confetti
-    confetti({
-      particleCount: 150,
-      spread: 90,
-      origin: { y: 0.5 },
-    });
-
-    setLastInvoice(newInvoice);
-    setIsReceiptOpen(true);
+    try {
+      confetti({
+        particleCount: 150,
+        spread: 90,
+        origin: { y: 0.5 },
+      });
+    } catch {}
 
     setBulkSelectedJobIds([]);
     setDiscount('');
-    loadData();
   };
 
   const profile = getStoredProfile();

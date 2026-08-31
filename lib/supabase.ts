@@ -286,56 +286,63 @@ export async function saveStoredJobs(jobs: JobCard[]) {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(cleanJobs));
   }
 
-  // Ensure invoice exists for any Delivered / Paid job
-  for (const j of cleanJobs) {
-    if (j.status === 'Delivered') {
-      await ensureInvoiceForDeliveredJob(j);
-    }
-  }
-
-  const supabase = getSupabaseClient();
-  if (supabase) {
+  // Non-blocking background sync so UI never freezes or waits for network calls!
+  (async () => {
+    // Ensure invoice exists for any Delivered / Paid job
     for (const j of cleanJobs) {
+      if (j.status === 'Delivered') {
+        await ensureInvoiceForDeliveredJob(j);
+      }
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const upsertPromises = cleanJobs.map((j) =>
+        supabase.from('job_cards').upsert(
+          {
+            job_no: j.job_no,
+            customer_name: j.customer_name,
+            phone_number: j.phone_number,
+            machine_category: j.machine_category,
+            brand_model: j.brand_model,
+            serial_number: j.serial_number,
+            reported_fault: j.reported_fault,
+            status: j.status,
+            labor_charge: j.labor_charge,
+            advance_deposit: j.advance_deposit,
+            total_amount: j.total_amount,
+            assigned_technician_name: j.assigned_technician_name,
+            has_external_parts: j.has_external_parts,
+            ext_shop_name: j.ext_shop_name,
+            ext_part_name: j.ext_part_name,
+            ext_cost_price: j.ext_cost_price,
+            ext_selling_price: j.ext_selling_price,
+            external_parts_note: JSON.stringify(j.parts || []),
+            created_at: j.created_at,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'job_no' }
+        )
+      );
       try {
-        await supabase.from('job_cards').upsert({
-          job_no: j.job_no,
+        await Promise.all(upsertPromises);
+      } catch (e) {
+        console.error('Background Supabase upsert error:', e);
+      }
+    }
+
+    // Auto-save/update customer records in database
+    for (const j of cleanJobs) {
+      if (j.customer_name && j.phone_number) {
+        saveOrUpdateCustomer({
           customer_name: j.customer_name,
           phone_number: j.phone_number,
           machine_category: j.machine_category,
           brand_model: j.brand_model,
-          serial_number: j.serial_number,
-          reported_fault: j.reported_fault,
-          status: j.status,
-          labor_charge: j.labor_charge,
-          advance_deposit: j.advance_deposit,
-          total_amount: j.total_amount,
-          assigned_technician_name: j.assigned_technician_name,
-          has_external_parts: j.has_external_parts,
-          ext_shop_name: j.ext_shop_name,
-          ext_part_name: j.ext_part_name,
-          ext_cost_price: j.ext_cost_price,
-          ext_selling_price: j.ext_selling_price,
-          external_parts_note: JSON.stringify(j.parts || []),
-          created_at: j.created_at,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'job_no' });
-      } catch (e) {
-        console.error('Failed to upsert job card to Supabase:', e);
+        });
       }
     }
-  }
-
-  // Auto-save/update customer records in database
-  for (const j of cleanJobs) {
-    if (j.customer_name && j.phone_number) {
-      saveOrUpdateCustomer({
-        customer_name: j.customer_name,
-        phone_number: j.phone_number,
-        machine_category: j.machine_category,
-        brand_model: j.brand_model,
-      });
-    }
-  }
+  })();
 }
 
 // Helper to calculate simple string hash
@@ -631,26 +638,32 @@ export async function saveStoredInvoices(invoices: Invoice[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_invoices', JSON.stringify(invoices));
   }
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    for (const inv of invoices) {
+  (async () => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const promises = invoices.map((inv) =>
+        supabase.from('invoices').upsert(
+          {
+            invoice_no: inv.invoice_no,
+            customer_name: inv.customer_name,
+            phone_number: inv.phone_number,
+            subtotal: inv.subtotal,
+            discount: inv.discount,
+            net_payable: inv.net_payable,
+            payment_method: inv.payment_method,
+            status: inv.status,
+            created_at: inv.created_at,
+          },
+          { onConflict: 'invoice_no' }
+        )
+      );
       try {
-        await supabase.from('invoices').upsert({
-          invoice_no: inv.invoice_no,
-          customer_name: inv.customer_name,
-          phone_number: inv.phone_number,
-          subtotal: inv.subtotal,
-          discount: inv.discount,
-          net_payable: inv.net_payable,
-          payment_method: inv.payment_method,
-          status: inv.status,
-          created_at: inv.created_at,
-        }, { onConflict: 'invoice_no' });
+        await Promise.all(promises);
       } catch (e) {
         console.error('Failed to upsert invoice to Supabase:', e);
       }
     }
-  }
+  })();
 }
 
 export async function deleteStoredInvoice(invoiceId: string, invoiceNo: string) {
