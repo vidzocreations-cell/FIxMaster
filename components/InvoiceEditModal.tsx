@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag } from 'lucide-react';
-import { Invoice, PaymentMethod, JobPart, Part } from '@/lib/types';
-import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts } from '@/lib/supabase';
+import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag, RotateCcw, Building2 } from 'lucide-react';
+import { Invoice, PaymentMethod, JobPart, Part, JobCard } from '@/lib/types';
+import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts, deleteStoredInvoice } from '@/lib/supabase';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -25,6 +25,9 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
   const [subtotal, setSubtotal] = useState<number | ''>('');
   const [discount, setDiscount] = useState<number | ''>('');
   const [netPayable, setNetPayable] = useState<number | ''>('');
+  
+  // Linked Jobs for Multi-Job Master Invoice
+  const [linkedJobCards, setLinkedJobCards] = useState<JobCard[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -36,9 +39,16 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
       setPhoneNumber(invoiceToEdit.phone_number);
       setPaymentMethod(invoiceToEdit.payment_method || 'Cash');
 
-      // Load all catalog parts for quick dropdown selection
+      // Load catalog parts
       const availableCatalog = getStoredParts();
       setCatalogParts(availableCatalog);
+
+      // Check if consolidated master invoice with linked jobs
+      if (invoiceToEdit.job_cards && invoiceToEdit.job_cards.length > 0) {
+        setLinkedJobCards(invoiceToEdit.job_cards);
+      } else {
+        setLinkedJobCards([]);
+      }
 
       // Load matching job card to extract parts
       const allJobs = getStoredJobs();
@@ -96,6 +106,72 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
     setSubtotal(newSub);
     setDiscount(currentDisc);
     setNetPayable(newNet);
+  };
+
+  const handleUnlinkJobReturnToPOS = async (jobId: string, jobNo: string) => {
+    if (
+      confirm(
+        `Are you sure you want to remove Job ${jobNo} from this master invoice and return it back to POS Completed status?`
+      )
+    ) {
+      // 1. Update job card status from Delivered BACK to Completed!
+      const allJobs = getStoredJobs();
+      const updatedJobs = allJobs.map((j) => {
+        if (j.id === jobId || j.job_no === jobNo) {
+          return {
+            ...j,
+            status: 'Completed' as const,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return j;
+      });
+      await saveStoredJobs(updatedJobs);
+
+      // 2. Remove job from linkedJobCards array
+      const remainingJobs = linkedJobCards.filter((j) => j.id !== jobId && j.job_no !== jobNo);
+      setLinkedJobCards(remainingJobs);
+
+      // 3. Recalculate Master Invoice Subtotal & Net Payable
+      const newPartsSum = remainingJobs.reduce((acc, j) => {
+        const pTotal = j.parts ? j.parts.reduce((a, b) => a + b.total_price, 0) : 0;
+        return acc + pTotal;
+      }, 0);
+      const newLaborSum = remainingJobs.reduce((acc, j) => acc + (j.labor_charge || 0), 0);
+      const newDepositSum = remainingJobs.reduce((acc, j) => acc + (j.advance_deposit || 0), 0);
+      const newSubtotal = newPartsSum + newLaborSum;
+      const discNum = Number(discount) || 0;
+      const newNetPayable = Math.max(0, newSubtotal - newDepositSum - discNum);
+
+      setSubtotal(newSubtotal);
+      setNetPayable(newNetPayable);
+
+      // 4. Update the Invoice in LocalStorage & Supabase Cloud
+      const invoices = getStoredInvoices();
+      if (remainingJobs.length === 0) {
+        // If all jobs were unlinked/returned, delete the master invoice completely!
+        await deleteStoredInvoice(invoiceToEdit.id, invoiceToEdit.invoice_no);
+        alert(`✓ All jobs returned to POS. Master Invoice ${invoiceToEdit.invoice_no} has been closed.`);
+        onSaved();
+        onClose();
+        return;
+      } else {
+        const updatedInvoices = invoices.map((inv) => {
+          if (inv.id === invoiceToEdit.id || inv.invoice_no === invoiceToEdit.invoice_no) {
+            return {
+              ...inv,
+              subtotal: newSubtotal,
+              net_payable: newNetPayable,
+              job_cards: remainingJobs,
+            };
+          }
+          return inv;
+        });
+        await saveStoredInvoices(updatedInvoices);
+        alert(`✓ Job ${jobNo} has been returned to POS Completed list! Master invoice total updated.`);
+        onSaved();
+      }
+    }
   };
 
   const handlePartNameChange = (index: number, name: string) => {
@@ -205,6 +281,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           discount: discNum,
           net_payable: netNum,
           job_card: updatedJobCard,
+          job_cards: linkedJobCards.length > 0 ? linkedJobCards : inv.job_cards,
         };
       }
       return inv;
@@ -254,102 +331,143 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pb-12 sm:pb-0 text-xs">
-          {/* Customer Name */}
-          <div>
-            <label className="block font-semibold text-slate-300 mb-1">Customer Full Name *</label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                required
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-              />
+        {/* Linked Jobs Unlink / Return-to-POS Section */}
+        {linkedJobCards.length > 0 && (
+          <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-amber-400" /> Linked Jobs in Master Invoice ({linkedJobCards.length} Jobs):
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Accidentally added job? Click Return to POS to un-link it!
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {linkedJobCards.map((jCard, index) => {
+                const jParts = jCard.parts ? jCard.parts.reduce((a, b) => a + b.total_price, 0) : 0;
+                const jLabor = jCard.labor_charge || 0;
+                const jDep = jCard.advance_deposit || 0;
+                const jNet = Math.max(0, jParts + jLabor - jDep);
+
+                return (
+                  <div key={jCard.id || index} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div>
+                      <div className="font-bold text-white flex items-center gap-2">
+                        <span className="font-mono text-cyan-400">{jCard.job_no}</span>
+                        <span>{jCard.machine_category} - {jCard.brand_model}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono pt-0.5">
+                        Parts: LKR {jParts.toLocaleString()} | Labor: LKR {jLabor.toLocaleString()} | Net: LKR {jNet.toLocaleString()}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUnlinkJobReturnToPOS(jCard.id, jCard.job_no)}
+                      className="py-1.5 px-3 rounded-lg text-xs font-extrabold text-amber-300 bg-amber-950 border border-amber-800 hover:bg-amber-900 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                      title="Remove job from master bill and return back to POS Completed list"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                      <span>↩️ Return Job to POS</span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        )}
 
-          {/* Phone Number & Payment Method */}
+        <form onSubmit={handleSubmit} className="space-y-4 pb-12 sm:pb-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-slate-300 mb-1">Phone Number *</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Full Name *</label>
               <div className="relative">
-                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-300 mb-1">Payment Method</label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
-              >
-                <option value="Cash">Cash</option>
-                <option value="Card">Credit / Debit Card</option>
-                <option value="Mobile Payment">Mobile Payment (EzCash / Koko)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-              </select>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-mono"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Itemized Parts & Prices Table */}
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="font-bold text-cyan-400 flex items-center gap-1.5">
-                <Package className="w-4 h-4" /> Itemized Spare Parts & Retail Prices (කොටස්වල මිල වෙනස් කරන්න)
-              </h3>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer font-semibold"
+            >
+              <option value="Cash">Cash</option>
+              <option value="Card">Card</option>
+              <option value="Mobile Payment">Mobile Payment</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
 
-              <div className="flex items-center gap-2">
-                {/* Catalog Quick Add Select */}
-                {catalogParts.length > 0 && (
-                  <select
-                    value={selectedCatalogPartId}
-                    onChange={(e) => handleAddCatalogPartSelect(e.target.value)}
-                    className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-2 py-1 text-[11px] focus:border-cyan-500 focus:outline-none cursor-pointer max-w-[170px]"
-                  >
-                    <option value="">+ From Catalog Stock</option>
-                    {catalogParts.map((catP) => (
-                      <option key={catP.id} value={catP.id}>
-                        {catP.part_name} (LKR {catP.retail_price})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleAddNewPartRow}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" /> Add Custom Item
-                </button>
-              </div>
+          {/* Itemized Parts Section */}
+          <div className="space-y-3 p-4 rounded-xl bg-slate-950 border border-slate-800">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-cyan-400" /> Itemized Spare Parts & Services
+              </span>
+              <button
+                type="button"
+                onClick={handleAddNewPartRow}
+                className="py-1 px-2.5 rounded-lg text-xs font-bold text-cyan-400 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Custom Row
+              </button>
             </div>
 
-            <div className="space-y-2">
+            {/* Catalog Dropdown Quick Add */}
+            {catalogParts.length > 0 && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11px] text-slate-400 shrink-0">Quick Add Catalog Part:</span>
+                <select
+                  value={selectedCatalogPartId}
+                  onChange={(e) => handleAddCatalogPartSelect(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Choose spare part from catalog --</option>
+                  {catalogParts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.part_name} (Stock: {p.stock_quantity}) - LKR {p.retail_price.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Parts Table */}
+            <div className="space-y-2 pt-2">
               {partsList.length === 0 ? (
-                <div className="p-4 text-center text-slate-500 text-[11px] italic space-y-1">
-                  <p>No spare parts items attached yet.</p>
-                  <p className="text-cyan-400 font-semibold">Click &apos;+ Add Custom Item&apos; or pick &apos;+ From Catalog Stock&apos; to add parts to this receipt.</p>
-                </div>
+                <p className="text-xs text-slate-500 italic text-center py-2">(No spare parts attached)</p>
               ) : (
-                partsList.map((p, idx) => (
-                  <div key={p.id || idx} className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2 rounded-xl border border-slate-800/80">
+                partsList.map((part, index) => (
+                  <div key={part.id || index} className="grid grid-cols-12 gap-2 items-center text-xs bg-slate-900 p-2 rounded-lg border border-slate-800">
                     <div className="col-span-5">
                       <input
                         type="text"
-                        value={p.part_name}
-                        onChange={(e) => handlePartNameChange(idx, e.target.value)}
-                        placeholder="Part Name"
+                        value={part.part_name}
+                        onChange={(e) => handlePartNameChange(index, e.target.value)}
+                        placeholder="Part name"
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
@@ -357,35 +475,33 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
                       <input
                         type="number"
                         min="1"
-                        value={p.quantity}
-                        onChange={(e) => handlePartQtyChange(idx, e.target.value === '' ? '' : Number(e.target.value))}
-                        onFocus={(e) => e.target.select()}
+                        value={part.quantity}
+                        onChange={(e) => handlePartQtyChange(index, e.target.value === '' ? '' : Number(e.target.value))}
                         placeholder="Qty"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-center text-slate-200 focus:border-cyan-500 focus:outline-none font-mono"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-center font-mono text-slate-200 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
                     <div className="col-span-3">
                       <input
                         type="number"
                         min="0"
-                        value={p.unit_price}
-                        onChange={(e) => handlePartPriceChange(idx, e.target.value === '' ? '' : Number(e.target.value))}
-                        onFocus={(e) => e.target.select()}
+                        value={part.unit_price}
+                        onChange={(e) => handlePartPriceChange(index, e.target.value === '' ? '' : Number(e.target.value))}
                         placeholder="Unit Price"
-                        className="w-full bg-slate-950 border border-emerald-800 rounded-lg px-2 py-1 text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-right font-mono text-slate-200 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
-                    <div className="col-span-2 flex items-center justify-end gap-1">
-                      <span className="font-mono text-[11px] text-emerald-400 font-bold hidden sm:inline">
-                        LKR {p.total_price.toLocaleString()}
+                    <div className="col-span-2 flex items-center justify-between gap-1 pl-1">
+                      <span className="font-mono font-bold text-emerald-400 text-[11px]">
+                        LKR {part.total_price.toLocaleString()}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleRemovePart(idx)}
-                        className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all cursor-pointer"
-                        title="Delete Item"
+                        onClick={() => handleRemovePart(index)}
+                        className="p-1 rounded text-red-400 hover:text-white bg-red-950 hover:bg-red-900 transition-all cursor-pointer"
+                        title="Remove part item"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -394,70 +510,50 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
             </div>
           </div>
 
-          {/* Subtotal, Labor, Discount & Net Payable Box */}
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <h3 className="font-bold text-emerald-400 flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4" /> Labor & Final Financial Summary
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Labor Fee (LKR)</label>
+          {/* Labor & Financial Totals */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Labor Charge (LKR)</label>
+              <div className="relative">
+                <DollarSign className="w-4 h-4 text-emerald-500 absolute left-3 top-2.5" />
                 <input
                   type="number"
                   min="0"
                   value={laborCharge}
                   onChange={(e) => updateFinancials(partsList, e.target.value === '' ? '' : Number(e.target.value), discount)}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Subtotal (LKR)</label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={subtotal}
-                  onChange={(e) => {
-                    const newSub = e.target.value === '' ? '' : Number(e.target.value);
-                    setSubtotal(newSub);
-                    setNetPayable(Math.max(0, (Number(newSub) || 0) - (Number(discount) || 0)));
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-red-400 mb-1">Discount (LKR)</label>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Discount Allowed (LKR)</label>
+              <div className="relative">
+                <Tag className="w-4 h-4 text-amber-500 absolute left-3 top-2.5" />
                 <input
                   type="number"
                   min="0"
                   value={discount}
                   onChange={(e) => updateFinancials(partsList, laborCharge, e.target.value === '' ? '' : Number(e.target.value))}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-slate-900 border border-red-800 rounded-lg px-2.5 py-1.5 text-xs text-red-400 font-mono focus:border-red-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-emerald-400 mb-1">Net Payable (LKR)</label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={netPayable}
-                  onChange={(e) => setNetPayable(e.target.value === '' ? '' : Number(e.target.value))}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full bg-slate-900 border border-emerald-800 rounded-lg px-2.5 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-amber-300 font-mono font-bold focus:border-amber-500 focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Subtotal & Net Payable Banner */}
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+            <div>
+              <span className="text-slate-400 block">Subtotal (Parts + Labor):</span>
+              <span className="font-mono font-bold text-slate-200">LKR {Number(subtotal || 0).toLocaleString()}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-emerald-400 font-bold block">Net Payable Balance:</span>
+              <span className="text-base font-mono font-black text-emerald-400">LKR {Number(netPayable || 0).toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Modal Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
             <button
               type="button"
@@ -468,9 +564,9 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
-              <Save className="w-4 h-4" /> Save Receipt & Parts Changes
+              <Save className="w-4 h-4" /> Save Receipt Changes
             </button>
           </div>
         </form>
