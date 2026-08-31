@@ -109,6 +109,8 @@ export interface Invoice {
   status: 'Paid';
   created_at: string;
   job_card?: JobCard;
+  job_cards?: JobCard[];
+  is_consolidated?: boolean;
 }
 
 export interface BusinessProfile {

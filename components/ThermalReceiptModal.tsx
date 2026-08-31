@@ -145,53 +145,100 @@ ${deposit > 0 ? `• Advance Deposit: - ${currencyStr} ${deposit.toLocaleString(
             </div>
           </div>
 
-          {/* Machine Info */}
-          {targetJob && (
-            <div className="p-2 bg-gray-100 rounded border border-gray-300 text-[11px] space-y-0.5 text-black">
-              <div className="flex justify-between font-bold">
-                <span>{targetJob.machine_category}</span>
-                <span>{targetJob.brand_model}</span>
+          {/* Machine Info / Multi-Job Consolidated Items */}
+          {invoice?.is_consolidated && invoice?.job_cards && invoice.job_cards.length > 0 ? (
+            <div className="space-y-3 py-1">
+              <div className="p-1.5 bg-gray-200 font-extrabold text-[11px] text-center uppercase tracking-wider rounded border border-gray-400">
+                CONSOLIDATED MASTER BILL ({invoice.job_cards.length} MACHINES REPAIRED)
               </div>
-              {targetJob.serial_number && <p className="text-[10px] text-gray-700">S/N: {targetJob.serial_number}</p>}
-              <p className="text-[10px] text-gray-800"><span className="font-bold">Fault:</span> {targetJob.reported_fault}</p>
-            </div>
-          )}
+              {invoice.job_cards.map((jCard, jIdx) => {
+                const jParts = jCard.parts || [];
+                const jLabor = jCard.labor_charge || 0;
+                const jDeposit = jCard.advance_deposit || 0;
+                const jPartsSum = jParts.reduce((a, b) => a + b.total_price, 0);
 
-          {/* Line Items Table */}
-          <div className="py-1">
-            <table className="w-full text-[11px] text-left border-collapse">
-              <thead>
-                <tr className="border-b-2 border-black font-bold uppercase text-[10px] text-black">
-                  <th className="py-1">Item / Description</th>
-                  <th className="py-1 text-center">Qty</th>
-                  <th className="py-1 text-right">Price</th>
-                  <th className="py-1 text-right">Total ({currencyStr})</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 text-black">
-                {parts.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-1.5 text-center text-gray-500 italic text-[10px]">
-                      (No Spare Parts Charged)
-                    </td>
-                  </tr>
-                ) : (
-                  parts.map((p, idx) => (
-                    <tr key={p.id || idx}>
-                      <td className="py-1 text-black font-medium">{p.part_name}</td>
-                      <td className="py-1 text-center">{p.quantity}</td>
-                      <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
-                      <td className="py-1 text-right font-bold">{p.total_price.toLocaleString()}</td>
+                return (
+                  <div key={jCard.id || jIdx} className="p-2 bg-gray-50 rounded border border-gray-300 text-[11px] space-y-1 text-black">
+                    <div className="flex justify-between font-extrabold border-b border-gray-300 pb-1">
+                      <span>{jCard.job_no}: {jCard.machine_category}</span>
+                      <span>{jCard.brand_model}</span>
+                    </div>
+                    {jParts.length > 0 && (
+                      <div className="text-[10px] space-y-0.5 pt-0.5">
+                        <p className="font-bold text-gray-700">Parts Used:</p>
+                        {jParts.map((p, pIdx) => (
+                          <div key={pIdx} className="flex justify-between text-gray-800">
+                            <span>• {p.part_name} (x{p.quantity})</span>
+                            <span>{currencyStr} {p.total_price.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-[10px] text-gray-800 pt-0.5">
+                      <span>Labor Charge:</span>
+                      <span>{currencyStr} {jLabor.toLocaleString()}</span>
+                    </div>
+                    {jDeposit > 0 && (
+                      <div className="flex justify-between text-[10px] font-bold text-gray-800">
+                        <span>Advance Deposit:</span>
+                        <span>- {currencyStr} {jDeposit.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {/* Single Machine Info */}
+              {targetJob && (
+                <div className="p-2 bg-gray-100 rounded border border-gray-300 text-[11px] space-y-0.5 text-black">
+                  <div className="flex justify-between font-bold">
+                    <span>{targetJob.machine_category}</span>
+                    <span>{targetJob.brand_model}</span>
+                  </div>
+                  {targetJob.serial_number && <p className="text-[10px] text-gray-700">S/N: {targetJob.serial_number}</p>}
+                  <p className="text-[10px] text-gray-800"><span className="font-bold">Fault:</span> {targetJob.reported_fault}</p>
+                </div>
+              )}
+
+              {/* Line Items Table */}
+              <div className="py-1">
+                <table className="w-full text-[11px] text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-black font-bold uppercase text-[10px] text-black">
+                      <th className="py-1">Item / Description</th>
+                      <th className="py-1 text-center">Qty</th>
+                      <th className="py-1 text-right">Price</th>
+                      <th className="py-1 text-right">Total ({currencyStr})</th>
                     </tr>
-                  ))
-                )}
-                <tr className="border-t border-gray-300">
-                  <td className="py-1.5 font-bold text-black" colSpan={3}>Service & Labor Charge</td>
-                  <td className="py-1.5 text-right font-bold">{labor.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-black">
+                    {parts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-1.5 text-center text-gray-500 italic text-[10px]">
+                          (No Spare Parts Charged)
+                        </td>
+                      </tr>
+                    ) : (
+                      parts.map((p, idx) => (
+                        <tr key={p.id || idx}>
+                          <td className="py-1 text-black font-medium">{p.part_name}</td>
+                          <td className="py-1 text-center">{p.quantity}</td>
+                          <td className="py-1 text-right">{p.unit_price.toLocaleString()}</td>
+                          <td className="py-1 text-right font-bold">{p.total_price.toLocaleString()}</td>
+                        </tr>
+                      ))
+                    )}
+                    <tr className="border-t border-gray-300">
+                      <td className="py-1.5 font-bold text-black" colSpan={3}>Service & Labor Charge</td>
+                      <td className="py-1.5 text-right font-bold">{labor.toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
           {/* Financial Totals */}
           <div className="border-t-2 border-dashed border-black pt-2 space-y-1 text-right text-[11px] text-black">

@@ -650,8 +650,10 @@ export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
     }
 
     const allJobs = getStoredJobs();
+    const localInvoices = getStoredInvoices();
 
     const cloudInvoices: Invoice[] = (data || []).map((row: any) => {
+      const localMatch = localInvoices.find((li) => li.invoice_no === row.invoice_no);
       const matchedJob = allJobs.find(
         (j) => (row.job_card_id && j.id === row.job_card_id) || j.customer_name === row.customer_name
       );
@@ -669,6 +671,8 @@ export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
         status: row.status || 'Paid',
         created_at: row.created_at,
         job_card: matchedJob,
+        job_cards: localMatch?.job_cards,
+        is_consolidated: localMatch?.is_consolidated,
       };
     });
 
