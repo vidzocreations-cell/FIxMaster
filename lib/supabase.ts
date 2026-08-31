@@ -72,6 +72,14 @@ const INITIAL_JOBS: JobCard[] = [
 
 let cachedClient: SupabaseClient | null = null;
 
+// In-Memory Ultra-Fast Caches for 0ms latency and zero JSON parsing overhead during renders
+let _jobsCache: JobCard[] | null = null;
+let _invoicesCache: Invoice[] | null = null;
+let _partsCache: Part[] | null = null;
+let _customersCache: Customer[] | null = null;
+let _profileCache: BusinessProfile | null = null;
+let _techniciansCache: Technician[] | null = null;
+
 // Always returns the 100% working Supabase client instance
 export function getSupabaseClient() {
   if (!cachedClient) {
@@ -82,20 +90,25 @@ export function getSupabaseClient() {
 
 // Technicians Storage Helpers
 export function getStoredTechnicians(): Technician[] {
+  if (_techniciansCache) return _techniciansCache;
   if (typeof window === 'undefined') return INITIAL_TECHNICIANS;
   const data = localStorage.getItem('fixmaster_technicians');
   if (!data) {
     localStorage.setItem('fixmaster_technicians', JSON.stringify(INITIAL_TECHNICIANS));
+    _techniciansCache = INITIAL_TECHNICIANS;
     return INITIAL_TECHNICIANS;
   }
   try {
-    return JSON.parse(data);
+    _techniciansCache = JSON.parse(data);
+    return _techniciansCache!;
   } catch {
+    _techniciansCache = INITIAL_TECHNICIANS;
     return INITIAL_TECHNICIANS;
   }
 }
 
 export function saveStoredTechnicians(technicians: Technician[]) {
+  _techniciansCache = technicians;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_technicians', JSON.stringify(technicians));
   }
@@ -109,20 +122,25 @@ export function deleteStoredTechnician(techId: string) {
 
 // LocalStorage Persistence Helpers
 export function getStoredParts(): Part[] {
+  if (_partsCache) return _partsCache;
   if (typeof window === 'undefined') return INITIAL_PARTS;
   const data = localStorage.getItem('fixmaster_parts');
   if (!data) {
     localStorage.setItem('fixmaster_parts', JSON.stringify(INITIAL_PARTS));
+    _partsCache = INITIAL_PARTS;
     return INITIAL_PARTS;
   }
   try {
-    return JSON.parse(data);
+    _partsCache = JSON.parse(data);
+    return _partsCache!;
   } catch {
+    _partsCache = INITIAL_PARTS;
     return INITIAL_PARTS;
   }
 }
 
 export function saveStoredParts(parts: Part[]) {
+  _partsCache = parts;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_parts', JSON.stringify(parts));
   }
@@ -144,16 +162,20 @@ export function saveStoredParts(parts: Part[]) {
 }
 
 export function getStoredJobs(): JobCard[] {
+  if (_jobsCache) return _jobsCache;
   if (typeof window === 'undefined') return INITIAL_JOBS;
   const data = localStorage.getItem('fixmaster_jobs');
   if (!data) {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(INITIAL_JOBS));
+    _jobsCache = INITIAL_JOBS;
     return INITIAL_JOBS;
   }
   try {
     const parsed: JobCard[] = JSON.parse(data);
-    return parsed.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
+    _jobsCache = parsed.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
+    return _jobsCache;
   } catch {
+    _jobsCache = INITIAL_JOBS;
     return INITIAL_JOBS;
   }
 }
@@ -259,6 +281,7 @@ export async function clearAllSalesHistory() {
 
 export async function saveStoredJobs(jobs: JobCard[]) {
   const cleanJobs = jobs.filter(j => j.job_no !== 'SYS-CONFIG-PROFILE');
+  _jobsCache = cleanJobs;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(cleanJobs));
   }
@@ -579,6 +602,7 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
         };
       });
 
+    _jobsCache = cloudJobs;
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_jobs', JSON.stringify(cloudJobs));
     }
@@ -590,17 +614,20 @@ export async function fetchJobsFromSupabaseCloud(): Promise<JobCard[]> {
 }
 
 export function getStoredInvoices(): Invoice[] {
+  if (_invoicesCache) return _invoicesCache;
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem('fixmaster_invoices');
   if (!data) return [];
   try {
-    return JSON.parse(data);
+    _invoicesCache = JSON.parse(data);
+    return _invoicesCache!;
   } catch {
     return [];
   }
 }
 
 export async function saveStoredInvoices(invoices: Invoice[]) {
+  _invoicesCache = invoices;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_invoices', JSON.stringify(invoices));
   }
@@ -629,6 +656,7 @@ export async function saveStoredInvoices(invoices: Invoice[]) {
 export async function deleteStoredInvoice(invoiceId: string, invoiceNo: string) {
   const invoices = getStoredInvoices();
   const updated = invoices.filter(i => i.id !== invoiceId && i.invoice_no !== invoiceNo);
+  _invoicesCache = updated;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_invoices', JSON.stringify(updated));
   }
@@ -676,6 +704,7 @@ export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
       };
     });
 
+    _invoicesCache = cloudInvoices;
     if (typeof window !== 'undefined') {
       localStorage.setItem('fixmaster_invoices', JSON.stringify(cloudInvoices));
     }
