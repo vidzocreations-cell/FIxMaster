@@ -682,14 +682,12 @@ export default function POSPage() {
       </div>
 
       {/* Thermal Receipt Print Modal */}
-      {lastInvoice && (
-        <ThermalReceiptModal
-          isOpen={isReceiptOpen}
-          invoice={lastInvoice}
-          profile={profile}
-          onClose={() => setIsReceiptOpen(false)}
-        />
-      )}
+      <ThermalReceiptModal
+        isOpen={isReceiptOpen && !!lastInvoice}
+        invoice={lastInvoice}
+        profile={profile}
+        onClose={() => setIsReceiptOpen(false)}
+      />
     </div>
   );
 }

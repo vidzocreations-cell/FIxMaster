@@ -15,15 +15,10 @@ interface ThermalReceiptModalProps {
 }
 
 export default function ThermalReceiptModal({ isOpen, onClose, invoice, jobCard, profile }: ThermalReceiptModalProps) {
-  const [mounted, setMounted] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isOpen || !mounted) return null;
+  if (!isOpen || typeof window === 'undefined') return null;
 
   const handlePrint = () => {
     window.print();
