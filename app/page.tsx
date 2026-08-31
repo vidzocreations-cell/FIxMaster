@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { DollarSign, Calendar, Wrench, AlertTriangle, ArrowUpRight, Plus, ChevronRight, Package, CheckCircle2, Clock } from 'lucide-react';
+import { DollarSign, Calendar, Wrench, AlertTriangle, ArrowUpRight, Plus, ChevronRight, Package, CheckCircle2, Clock, Filter } from 'lucide-react';
 import { getStoredJobs, getStoredParts, getStoredInvoices } from '@/lib/supabase';
 import { JobCard, Part, Invoice } from '@/lib/types';
 import JobCardModal from '@/components/JobCardModal';
@@ -16,6 +16,25 @@ export default function DashboardPage() {
   const [isPartModalOpen, setIsPartModalOpen] = useState(false);
   const [partToRestock, setPartToRestock] = useState<Part | null>(null);
 
+  // Generate Past & Present Month Dropdown Options (Last 24 Months)
+  const generateMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const monthName = d.toLocaleString('en-US', { month: 'long' });
+      const value = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const label = i === 0 ? `${monthName} ${year} (Current)` : `${monthName} ${year}`;
+      options.push({ value, label, year, month, monthName });
+    }
+    return options;
+  };
+
+  const monthOptions = generateMonthOptions();
+  const [selectedYearMonth, setSelectedYearMonth] = useState<string>(monthOptions[0].value);
+
   const refreshData = () => {
     setJobs(getStoredJobs());
     setParts(getStoredParts());
@@ -28,19 +47,24 @@ export default function DashboardPage() {
 
   // Compute Revenue Stats
   const todayStr = new Date().toISOString().split('T')[0];
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
 
   const todayRevenue = invoices
     .filter((inv) => inv.created_at.startsWith(todayStr))
     .reduce((acc, inv) => acc + inv.net_payable, 0);
 
-  const monthRevenue = invoices
-    .filter((inv) => {
-      const d = new Date(inv.created_at);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    })
-    .reduce((acc, inv) => acc + inv.net_payable, 0);
+  // Selected Month Revenue Analytics
+  const [selYearStr, selMonthStr] = selectedYearMonth.split('-');
+  const selYear = parseInt(selYearStr, 10);
+  const selMonthIndex = parseInt(selMonthStr, 10) - 1;
+  const selectedOptionObj = monthOptions.find((m) => m.value === selectedYearMonth) || monthOptions[0];
+
+  const selectedMonthInvoices = invoices.filter((inv) => {
+    const d = new Date(inv.created_at);
+    return d.getFullYear() === selYear && d.getMonth() === selMonthIndex;
+  });
+
+  const monthRevenue = selectedMonthInvoices.reduce((acc, inv) => acc + inv.net_payable, 0);
+  const monthInvoiceCount = selectedMonthInvoices.length;
 
   const activeJobs = jobs.filter((j) => j.status === 'Pending' || j.status === 'In Progress');
   const lowStockParts = parts.filter((p) => p.stock_quantity <= p.min_stock_alert);
@@ -51,7 +75,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Dashboard Overview</h1>
-          <p className="text-xs text-slate-400">Live metrics, active repair cards & low stock monitoring</p>
+          <p className="text-xs text-slate-400">Live metrics, monthly sales analytics, active repair cards & low stock monitoring</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -76,7 +100,7 @@ export default function DashboardPage() {
       {/* Metrics Widgets Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Widget 1: Today Revenue */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Today&apos;s Sales Revenue</span>
             <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-400">
@@ -91,22 +115,38 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Widget 2: Monthly Revenue */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Monthly Revenue</span>
-            <div className="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/80 text-cyan-400">
-              <Calendar className="w-4 h-4" />
-            </div>
+        {/* Widget 2: Monthly Revenue with Month Selector */}
+        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1 text-slate-400">
+            <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1 shrink-0">
+              <Calendar className="w-4 h-4 text-cyan-400" /> Revenue:
+            </span>
+            {/* Interactive Month Selector Dropdown */}
+            <select
+              value={selectedYearMonth}
+              onChange={(e) => setSelectedYearMonth(e.target.value)}
+              className="bg-slate-900 border border-cyan-800/80 rounded-lg px-2 py-1 text-xs text-cyan-200 font-bold focus:border-cyan-500 focus:outline-none cursor-pointer max-w-[150px] truncate"
+            >
+              {monthOptions.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="text-2xl font-extrabold text-white font-mono">
+
+          <div className="text-2xl font-extrabold text-white font-mono pt-1">
             LKR {monthRevenue.toLocaleString()}
           </div>
-          <p className="text-[11px] text-slate-400">Current calendar month total</p>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-1.5">
+            <span>{selectedOptionObj.monthName} {selectedOptionObj.year}</span>
+            <span className="font-mono font-bold text-cyan-300">{monthInvoiceCount} Bills Issued</span>
+          </div>
         </div>
 
         {/* Widget 3: Pending Repairs */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Active Repair Jobs</span>
             <div className="p-2 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-400">
@@ -120,7 +160,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Widget 4: Low Stock Alert */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Low Stock Alerts</span>
             <div className="p-2 rounded-xl bg-red-950/60 border border-red-800/80 text-red-400">
