@@ -667,6 +667,36 @@ export async function deleteStoredInvoice(invoiceId: string, invoiceNo: string) 
   }
 }
 
+export async function returnFullInvoiceToPOS(invoice: Invoice) {
+  const allJobs = getStoredJobs();
+  let targetJobIds: string[] = [];
+
+  if (invoice.is_consolidated && invoice.job_cards && invoice.job_cards.length > 0) {
+    targetJobIds = invoice.job_cards.map((j) => j.id);
+  } else if (invoice.job_card_id) {
+    targetJobIds = [invoice.job_card_id];
+  } else {
+    const matchedJobs = allJobs.filter((j) => j.customer_name === invoice.customer_name && j.status === 'Delivered');
+    targetJobIds = matchedJobs.map((j) => j.id);
+  }
+
+  if (targetJobIds.length > 0) {
+    const updatedJobs = allJobs.map((j) => {
+      if (targetJobIds.includes(j.id) || (j.customer_name === invoice.customer_name && j.status === 'Delivered')) {
+        return {
+          ...j,
+          status: 'Completed' as const,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return j;
+    });
+    await saveStoredJobs(updatedJobs);
+  }
+
+  await deleteStoredInvoice(invoice.id, invoice.invoice_no);
+}
+
 export async function fetchInvoicesFromSupabaseCloud(): Promise<Invoice[]> {
   const supabase = getSupabaseClient();
 

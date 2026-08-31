@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag, RotateCcw, Building2 } from 'lucide-react';
 import { Invoice, PaymentMethod, JobPart, Part, JobCard } from '@/lib/types';
-import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts, deleteStoredInvoice } from '@/lib/supabase';
+import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts, deleteStoredInvoice, returnFullInvoiceToPOS } from '@/lib/supabase';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -243,6 +243,19 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
 
     updateFinancials([...partsList, newPartItem], laborCharge, discount);
     setSelectedCatalogPartId('');
+  };
+
+  const handleVoidAndReturnFullBillToPOS = async () => {
+    if (
+      confirm(
+        `Are you sure you want to void Invoice ${invoiceToEdit.invoice_no} and return all included repair jobs back to POS Completed status?`
+      )
+    ) {
+      await returnFullInvoiceToPOS(invoiceToEdit);
+      alert(`✓ Invoice ${invoiceToEdit.invoice_no} voided! All jobs returned to POS Completed status.`);
+      onSaved();
+      onClose();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -554,20 +567,32 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 z-40 pb-4 sm:pb-0">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              onClick={handleVoidAndReturnFullBillToPOS}
+              className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950 border border-amber-800 hover:bg-amber-900 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              title="Void this full invoice and return all included jobs back to POS Completed"
             >
-              Cancel
+              <RotateCcw className="w-4 h-4 text-amber-400" />
+              <span>↩️ Void & Return Full Bill to POS</span>
             </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <Save className="w-4 h-4" /> Save Receipt Changes
-            </button>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Save className="w-4 h-4" /> Save Receipt Changes
+              </button>
+            </div>
           </div>
         </form>
       </div>

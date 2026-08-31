@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { History, Search, Printer, Calendar, DollarSign, ArrowUpRight, Trash2, RefreshCw, Edit3, RotateCcw, Filter, AlertTriangle, CheckSquare, Square } from 'lucide-react';
-import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile, clearAllSalesHistory } from '@/lib/supabase';
+import { getStoredInvoices, fetchInvoicesFromSupabaseCloud, deleteStoredInvoice, getStoredProfile, clearAllSalesHistory, returnFullInvoiceToPOS } from '@/lib/supabase';
 import { Invoice } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 import InvoiceEditModal from '@/components/InvoiceEditModal';
@@ -50,6 +50,21 @@ export default function SalesHistoryPage() {
       await deleteStoredInvoice(invoiceId, invoiceNo);
       setInvoices((prev) => prev.filter((i) => i.id !== invoiceId && i.invoice_no !== invoiceNo));
       setSelectedInvoiceIds((prev) => prev.filter((id) => id !== invoiceId));
+    }
+  };
+
+  const handleReturnFullInvoiceToPOS = async (inv: Invoice) => {
+    if (
+      confirm(
+        `Are you sure you want to void Invoice ${inv.invoice_no} and return all included repair jobs back to POS Completed status?`
+      )
+    ) {
+      setIsCloudSyncing(true);
+      await returnFullInvoiceToPOS(inv);
+      setInvoices((prev) => prev.filter((i) => i.id !== inv.id && i.invoice_no !== inv.invoice_no));
+      setSelectedInvoiceIds((prev) => prev.filter((id) => id !== inv.id));
+      setIsCloudSyncing(false);
+      alert(`✓ Invoice ${inv.invoice_no} voided! All jobs returned to POS Completed status.`);
     }
   };
 
@@ -384,6 +399,14 @@ export default function SalesHistoryPage() {
                             title="Edit Receipt Details"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReturnFullInvoiceToPOS(inv)}
+                            className="p-1.5 rounded-lg text-amber-300 hover:text-white bg-amber-950/90 hover:bg-amber-900 border border-amber-700 transition-all cursor-pointer"
+                            title="Void Invoice & Return All Jobs back to POS Completed status"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
                           </button>
                           <button
                             type="button"
