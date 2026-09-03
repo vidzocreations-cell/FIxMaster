@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag, RotateCcw, Building2, Wrench } from 'lucide-react';
 import { Invoice, PaymentMethod, JobPart, Part, JobCard } from '@/lib/types';
 import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts, deleteStoredInvoice, returnFullInvoiceToPOS } from '@/lib/supabase';
+import JobCardModal from '@/components/JobCardModal';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
   
   // Linked Jobs for Multi-Job Master Invoice
   const [linkedJobCards, setLinkedJobCards] = useState<JobCard[]>([]);
+  const [editingLinkedJob, setEditingLinkedJob] = useState<JobCard | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -381,15 +383,27 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleUnlinkJobReturnToPOS(jCard.id, jCard.job_no)}
-                      className="py-1.5 px-3 rounded-lg text-xs font-extrabold text-amber-300 bg-amber-950 border border-amber-800 hover:bg-amber-900 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shrink-0"
-                      title="Remove job from master bill and return back to POS Completed list"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                      <span>↩️ Return Job to POS</span>
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingLinkedJob(jCard)}
+                        className="py-1.5 px-3 rounded-lg text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                        title="Edit job card fault, parts, labor, machine details"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>✏️ Edit Job</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleUnlinkJobReturnToPOS(jCard.id, jCard.job_no)}
+                        className="py-1.5 px-3 rounded-lg text-xs font-extrabold text-amber-300 bg-amber-950 border border-amber-800 hover:bg-amber-900 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                        title="Remove job from master bill and return back to POS Completed list"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                        <span>↩️ Return to POS</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -618,6 +632,55 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           </div>
         </form>
       </div>
+
+      {editingLinkedJob && (
+        <JobCardModal
+          isOpen={!!editingLinkedJob}
+          onClose={() => setEditingLinkedJob(null)}
+          jobToEdit={editingLinkedJob}
+          onSaved={async () => {
+            const freshJobs = getStoredJobs();
+            const updatedTarget = freshJobs.find(
+              (j) => j.id === editingLinkedJob.id || j.job_no === editingLinkedJob.job_no
+            );
+            if (updatedTarget) {
+              const newLinked = linkedJobCards.map((j) =>
+                j.id === updatedTarget.id || j.job_no === updatedTarget.job_no ? updatedTarget : j
+              );
+              setLinkedJobCards(newLinked);
+
+              const newPartsSum = newLinked.reduce((acc, j) => {
+                const pTotal = j.parts ? j.parts.reduce((a, b) => a + b.total_price, 0) : 0;
+                return acc + pTotal;
+              }, 0);
+              const newLaborSum = newLinked.reduce((acc, j) => acc + (j.labor_charge || 0), 0);
+              const newDepositSum = newLinked.reduce((acc, j) => acc + (j.advance_deposit || 0), 0);
+              const newSubtotal = newPartsSum + newLaborSum;
+              const discNum = Number(discount) || 0;
+              const newNetPayable = Math.max(0, newSubtotal - newDepositSum - discNum);
+
+              setSubtotal(newSubtotal);
+              setNetPayable(newNetPayable);
+
+              const allInvoices = getStoredInvoices();
+              const updatedInvoices = allInvoices.map((inv) => {
+                if (inv.id === invoiceToEdit.id || inv.invoice_no === invoiceToEdit.invoice_no) {
+                  return {
+                    ...inv,
+                    subtotal: newSubtotal,
+                    net_payable: newNetPayable,
+                    job_cards: newLinked,
+                  };
+                }
+                return inv;
+              });
+              await saveStoredInvoices(updatedInvoices);
+            }
+            setEditingLinkedJob(null);
+            onSaved();
+          }}
+        />
+      )}
     </div>
   );
 
