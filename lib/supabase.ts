@@ -531,6 +531,7 @@ export async function saveOrUpdateCustomer(data: {
 export async function deleteStoredJob(jobId: string, jobNo: string) {
   const jobs = getStoredJobs();
   const updated = jobs.filter(j => j.id !== jobId && j.job_no !== jobNo);
+  _jobsCache = updated;
   if (typeof window !== 'undefined') {
     localStorage.setItem('fixmaster_jobs', JSON.stringify(updated));
   }

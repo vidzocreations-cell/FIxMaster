@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
-import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw, Check, Clock, Building2, CheckSquare, Square } from 'lucide-react';
-import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud, generateNextInvoiceNo } from '@/lib/supabase';
+import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw, Check, Clock, Building2, CheckSquare, Square, Trash2 } from 'lucide-react';
+import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud, generateNextInvoiceNo, deleteStoredJob } from '@/lib/supabase';
 import { JobCard, Invoice, PaymentMethod } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
 
@@ -95,6 +95,39 @@ export default function POSPage() {
       setBulkSelectedJobIds([]);
     } else {
       setBulkSelectedJobIds(allFilteredIds);
+    }
+  };
+
+  const handleDeleteSingleJob = async (jobId: string, jobNo: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (confirm(`Are you sure you want to delete Job Card ${jobNo} from POS? This action cannot be undone.`)) {
+      await deleteStoredJob(jobId, jobNo);
+      setJobs((prev) => prev.filter((j) => j.id !== jobId && j.job_no !== jobNo));
+      if (selectedJob?.id === jobId || selectedJob?.job_no === jobNo) {
+        setSelectedJob(null);
+      }
+      setBulkSelectedJobIds((prev) => prev.filter((id) => id !== jobId));
+    }
+  };
+
+  const handleBulkDeleteJobs = async () => {
+    if (bulkSelectedJobIds.length === 0) return;
+    const count = bulkSelectedJobIds.length;
+    if (confirm(`Are you sure you want to delete ${count} selected job card(s) from POS? This action cannot be undone.`)) {
+      setIsCloudSyncing(true);
+      for (const id of bulkSelectedJobIds) {
+        const target = jobs.find((j) => j.id === id);
+        if (target) {
+          await deleteStoredJob(target.id, target.job_no);
+        }
+      }
+      setJobs((prev) => prev.filter((j) => !bulkSelectedJobIds.includes(j.id)));
+      if (selectedJob && bulkSelectedJobIds.includes(selectedJob.id)) {
+        setSelectedJob(null);
+      }
+      setBulkSelectedJobIds([]);
+      setIsCloudSyncing(false);
+      alert(`✓ ${count} job card(s) deleted successfully from POS.`);
     }
   };
 
@@ -351,16 +384,67 @@ export default function POSPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
               {filterTab === 'CorporateBulk'
                 ? `Available Corporate Jobs (${filteredJobs.length})`
                 : `${filterTab} Repair Jobs (${filteredJobs.length})`}
             </h2>
-            <span className="text-xs text-slate-400">
-              {filterTab === 'CorporateBulk' ? 'Check jobs to combine into 1 invoice' : 'Click job card to load checkout totals'}
-            </span>
+
+            {filteredJobs.length > 0 && filterTab !== 'CorporateBulk' && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllBulkJobs}
+                  className="py-1 px-2.5 rounded-lg text-[11px] font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>
+                    {filteredJobs.every((j) => bulkSelectedJobIds.includes(j.id)) ? 'Deselect All' : 'Select All'}
+                  </span>
+                </button>
+
+                {bulkSelectedJobIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkDeleteJobs}
+                    className="py-1 px-2.5 rounded-lg text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 shadow transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete ({bulkSelectedJobIds.length})</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Bulk Delete Bar for Non-Corporate Tabs */}
+          {bulkSelectedJobIds.length > 0 && filterTab !== 'CorporateBulk' && (
+            <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 flex items-center justify-between gap-3 text-xs animate-in fade-in duration-150">
+              <span className="font-bold text-red-300 flex items-center gap-1.5">
+                <CheckSquare className="w-4 h-4 text-red-400" />
+                {bulkSelectedJobIds.length} Job Card(s) Selected
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkSelectedJobIds([])}
+                  className="py-1 px-2.5 rounded-lg text-slate-300 hover:text-white bg-slate-900 border border-slate-700 transition-all cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteJobs}
+                  className="py-1.5 px-3 rounded-lg text-xs font-extrabold text-white bg-red-600 hover:bg-red-500 shadow transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Selected ({bulkSelectedJobIds.length})</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
             {filteredJobs.length === 0 ? (
@@ -405,15 +489,13 @@ export default function POSPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          {filterTab === 'CorporateBulk' && (
-                            <input
-                              type="checkbox"
-                              checked={isBulkChecked}
-                              onChange={() => handleToggleBulkSelectJob(j.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 rounded border-slate-700 text-amber-500 focus:ring-amber-500 cursor-pointer"
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={isBulkChecked}
+                            onChange={() => handleToggleBulkSelectJob(j.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                          />
                           <span className="font-mono text-xs font-bold text-cyan-400">{j.job_no}</span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -437,14 +519,27 @@ export default function POSPage() {
                         </p>
                       </div>
 
-                      <div className="text-right space-y-1">
-                        <span className="text-[10px] text-slate-400 block">Job Net Balance:</span>
-                        <div className="text-sm font-mono font-extrabold text-emerald-400">
-                          LKR {jNet.toLocaleString()}
+                      <div className="text-right space-y-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Job Net Balance:</span>
+                          <div className="text-sm font-mono font-extrabold text-emerald-400">
+                            LKR {jNet.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">
+                            Parts: LKR {jPartsTotal.toLocaleString()} | Labor: LKR {jLabor.toLocaleString()}
+                          </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 block">
-                          Parts: LKR {jPartsTotal.toLocaleString()} | Labor: LKR {jLabor.toLocaleString()}
-                        </span>
+
+                        <div className="flex items-center justify-end gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteSingleJob(j.id, j.job_no, e)}
+                            className="p-1.5 rounded-lg text-red-400 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-800 transition-all cursor-pointer"
+                            title="Delete Job Card"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
