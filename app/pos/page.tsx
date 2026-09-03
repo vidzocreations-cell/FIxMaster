@@ -3,16 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
-import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw, Check, Clock, Building2, CheckSquare, Square, Trash2 } from 'lucide-react';
+import { CreditCard, CheckCircle2, DollarSign, Percent, Printer, ShoppingCart, User, Phone, Wrench, ArrowRight, RefreshCw, Check, Clock, Building2, CheckSquare, Square, Trash2, Edit3 } from 'lucide-react';
 import { getStoredJobs, saveStoredJobs, getStoredInvoices, saveStoredInvoices, getStoredProfile, fetchJobsFromSupabaseCloud, generateNextInvoiceNo, deleteStoredJob } from '@/lib/supabase';
 import { JobCard, Invoice, PaymentMethod } from '@/lib/types';
 import ThermalReceiptModal from '@/components/ThermalReceiptModal';
+import JobCardModal from '@/components/JobCardModal';
 
 export default function POSPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<JobCard[]>([]);
   const [filterTab, setFilterTab] = useState<'Completed' | 'Delivered' | 'CorporateBulk' | 'All'>('Completed');
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
+  const [editingJob, setEditingJob] = useState<JobCard | null>(null);
   
   // Corporate Multi-Job Billing State
   const [selectedCorporateCustomer, setSelectedCorporateCustomer] = useState<string>('');
@@ -533,6 +535,19 @@ export default function POSPage() {
                         <div className="flex items-center justify-end gap-1.5 pt-1">
                           <button
                             type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingJob(j);
+                            }}
+                            className="px-2 py-1 rounded-lg text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 transition-all cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                            title="Edit Job Card Details"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={(e) => handleDeleteSingleJob(j.id, j.job_no, e)}
                             className="p-1.5 rounded-lg text-red-400 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-800 transition-all cursor-pointer"
                             title="Delete Job Card"
@@ -687,12 +702,23 @@ export default function POSPage() {
               ) : (
                 <div className="space-y-4">
                   {/* Customer & Machine Card */}
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <div className="text-xs font-bold text-white">{selectedJob.customer_name}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{selectedJob.phone_number}</div>
-                    <div className="text-xs font-semibold text-cyan-300 pt-1">
-                      {selectedJob.machine_category} - {selectedJob.brand_model}
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white">{selectedJob.customer_name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{selectedJob.phone_number}</div>
+                      <div className="text-xs font-semibold text-cyan-300 pt-1">
+                        {selectedJob.machine_category} - {selectedJob.brand_model}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingJob(selectedJob)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Edit Job Card Details"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Edit Job</span>
+                    </button>
                   </div>
 
                   {/* Financial Breakdowns */}
@@ -785,6 +811,24 @@ export default function POSPage() {
         profile={profile}
         onClose={() => setIsReceiptOpen(false)}
       />
+
+      {/* Edit Job Card Modal */}
+      {editingJob && (
+        <JobCardModal
+          isOpen={!!editingJob}
+          onClose={() => setEditingJob(null)}
+          jobToEdit={editingJob}
+          onSaved={() => {
+            loadData();
+            if (selectedJob && (selectedJob.id === editingJob.id || selectedJob.job_no === editingJob.job_no)) {
+              const freshJobs = getStoredJobs();
+              const updated = freshJobs.find((j) => j.id === editingJob.id || j.job_no === editingJob.job_no);
+              if (updated) setSelectedJob(updated);
+            }
+            setEditingJob(null);
+          }}
+        />
+      )}
     </div>
   );
 }
