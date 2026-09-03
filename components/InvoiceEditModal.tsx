@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag, RotateCcw, Building2 } from 'lucide-react';
+import { X, Edit3, User, Phone, DollarSign, CreditCard, Save, Package, Plus, Trash2, Tag, RotateCcw, Building2, Wrench } from 'lucide-react';
 import { Invoice, PaymentMethod, JobPart, Part, JobCard } from '@/lib/types';
 import { getStoredInvoices, saveStoredInvoices, getStoredJobs, saveStoredJobs, getStoredParts, deleteStoredInvoice, returnFullInvoiceToPOS } from '@/lib/supabase';
 
@@ -17,6 +17,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
   const [mounted, setMounted] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [reportedFault, setReportedFault] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [partsList, setPartsList] = useState<JobPart[]>([]);
   const [catalogParts, setCatalogParts] = useState<Part[]>([]);
@@ -57,6 +58,9 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
         invoiceToEdit.job_card;
 
       let initialParts: JobPart[] = targetJob?.parts || [];
+
+      const faultVal = targetJob?.reported_fault || invoiceToEdit.job_card?.reported_fault || '';
+      setReportedFault(faultVal);
 
       if (initialParts.length === 0 && targetJob?.ext_part_name) {
         const sPrice = targetJob.ext_selling_price || targetJob.ext_cost_price || 0;
@@ -277,6 +281,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           ...targetJob,
           customer_name: customerName,
           phone_number: phoneNumber,
+          reported_fault: reportedFault,
           labor_charge: laborNum,
           parts: partsList,
           total_amount: subNum,
@@ -293,7 +298,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
           subtotal: subNum,
           discount: discNum,
           net_payable: netNum,
-          job_card: updatedJobCard,
+          job_card: updatedJobCard || (inv.job_card ? { ...inv.job_card, reported_fault: reportedFault } : undefined),
           job_cards: linkedJobCards.length > 0 ? linkedJobCards : inv.job_cards,
         };
       }
@@ -310,6 +315,7 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
             ...j,
             customer_name: customerName,
             phone_number: phoneNumber,
+            reported_fault: reportedFault,
             labor_charge: laborNum,
             parts: partsList,
             total_amount: subNum,
@@ -420,18 +426,34 @@ export default function InvoiceEditModal({ isOpen, onClose, invoiceToEdit, onSav
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer font-semibold"
-            >
-              <option value="Cash">Cash</option>
-              <option value="Card">Card</option>
-              <option value="Mobile Payment">Mobile Payment</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Machine Fault / Reported Issue * (මැෂින් එකේ දෝෂය)</label>
+              <div className="relative">
+                <Wrench className="w-4 h-4 text-amber-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={reportedFault}
+                  onChange={(e) => setReportedFault(e.target.value)}
+                  placeholder="e.g. Engine hard start, Blade replacement..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none font-semibold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer font-semibold"
+              >
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="Mobile Payment">Mobile Payment</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
           </div>
 
           {/* Itemized Parts Section */}
